@@ -21,7 +21,8 @@ or a .torrent file as a POST request where the file parameter is named "torrent_
 """
 
 import sys
-import urllib, urllib2, xmltodict, json, argparse, poster, collections
+import urllib, urllib2, xmltodict, json, argparse, poster, collections, re
+from pprint import pprint
 
 class bcolors:
     HEADER = '\033[95m'
@@ -51,8 +52,10 @@ def hexdump(src, length=16):
         
 class JustSeedIt():
     
-    api_key = "";
+    # Default options
+    api_key = ""; # Do not use this, use '.justseedit_api_key' file
     url = "https://api.justseed.it"
+    aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=4 --continue --max-connection-per-server=4"
     
     def __init__(self):
         # Obtain API key
@@ -69,6 +72,7 @@ class JustSeedIt():
         self.error = False
         self.debug = 0
         self.dry_run = 0
+        self.info_map = {}
     
     def quit(self, message):
         print "Error:", message
@@ -128,8 +132,8 @@ class JustSeedIt():
         
         if self.check_server_response(xml_response):
             self.error = False
-            if self.debug:
-                print xml_response
+            #if self.debug:
+            #    print xml_response
             return xml_response
         else:
             self.error = True
@@ -146,6 +150,7 @@ class JustSeedIt():
             #self.quit(error)
     
     def id_to_infohash(self, id):
+        #pprint(self.id_to_infohash_map)
         try:
             self.list_only()
             return self.id_to_infohash_map[id]
@@ -168,46 +173,66 @@ class JustSeedIt():
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/pieces.csp",{'info_hash': infohash })
-        print response_xml
-        return
+        return response_xml
 
     def bitfield(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/bitfield.csp",{'info_hash': infohash })
-        print response_xml
-        return
+        return response_xml
 
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
-        print response_xml
-        result = xmltodict.parse(xml_response)
-        return
-    
-    def download_links(self, infohash):
+        #print response_xml
+        result = xmltodict.parse(response_xml)
+        return response_xml
+ 
+    def files_xml(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
-        #print response_xml
-        
         result = xmltodict.parse(response_xml)
-        #print result
+        return response_xml
+    
+    def download_links(self, infohash):
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
         
+        response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
+        #response_xml = self.xml_from_file('files.xml') # debug
+        result = xmltodict.parse(response_xml)
+        urls = []
         if 'url' in result['result']['data']['row']:
             # Single file
-            print urllib.unquote(result['result']['data']['row']['url'])
-            return
+            urls.append( urllib.unquote(result['result']['data']['row']['url']) )
+            
         else:
             # Multiple files
             for row in result['result']['data']['row']:
                 if 'url' in row:
-                    print urllib.unquote(row['url'])
-        
+                    urls.append( urllib.unquote(row['url']) )
+        return urls
+
+    def aria2_script(self, infohash):
+        urls = self.download_links(infohash)
+        #pprint(self.id_to_infohash_map)
+        for url in urls:
+            file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
+            #print file_path
+            self.output_dir = 'd:/Downloads/justseed.it Downloads/'
+            #pprint(self.torrents)
+            if infohash in self.torrents:
+                if 'name' in self.torrents[infohash]:
+                    self.output_dir += self.torrents[infohash]['name']
+            
+            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(self.aria2_options, self.output_dir, file_path, url)
+        return
+                
     def info_xml(self, infohash):
         response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
         print response_xml
@@ -221,11 +246,8 @@ class JustSeedIt():
            
     def add_magnet(self,magnet):
         print "Adding magnet link with ratio {}".format(self.ratio)
-        
         response_xml = self.api("/torrent/add.csp",{'maximum_ratio':str(self.ratio), 'url': magnet })
-        #response_xml = self.api("/torrent/add.csp",{'maximum_ratio':"3", 'url': magnet })
         print response_xml
-        
         return
     
     def add_torrent_file(self,filename):
@@ -252,12 +274,48 @@ class JustSeedIt():
 
     def list_only(self):
         xml_response = self.api("/torrents/list.csp")
+        #print xml_response
         if xml_response:
             result = xmltodict.parse(xml_response)
             torrents = result['result']['data']['row']
+            
+            # Make new maps
             self.id_to_infohash_map = collections.OrderedDict()
+            self.torrents = collections.OrderedDict()
+            self.info_map = collections.OrderedDict()
+            
+            #pprint(torrents)
+            
             for torrent in torrents:
+                
+                
                 self.id_to_infohash_map[torrent['@id']] = torrent['info_hash']
+                
+                self.torrents[torrent['@id']] = { 'info_hash': torrent['info_hash'],
+                                                  'name': torrent['name'],
+                                                  'label': torrent['label'],
+                                                  'status': torrent['status'] }
+                
+                """
+                self.info_map[torrent['@id']]['name'] = torrent['name']
+                
+                #pprint(self.info_map)
+                
+                self.info_map[torrent['@id']]['label'] = torrent['label']
+                self.info_map[torrent['@id']]['status'] = torrent['status']
+                
+                self.info_map[torrent['info_hash']]['name'] = torrent['name']
+                self.info_map[torrent['info_hash']]['label'] = torrent['label']
+                self.info_map[torrent['info_hash']]['status'] = torrent['status']
+                """
+                
+                                
+            #if self.debug:
+            #pprint(self.torrents)
+        
+            
+        
+        return
                    
     def list(self):
         """ Show torrents in pretty format
@@ -311,7 +369,10 @@ if __name__ == "__main__":
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
-    
+    parser.add_argument("--files-xml", type=str, metavar='INFO-HASH', help='get files info (XML)')
+    parser.add_argument("--aria2", type=str, metavar='INFO-HASH', help='generate aria2 script for downloading')
+    parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
+    #parser.add_argument("--dummy-data", type=str, metavar='FILE', help='use dummy XML data')
     
     args = parser.parse_args()
     #print args
@@ -352,16 +413,25 @@ if __name__ == "__main__":
         jsi.info_map();
 
     elif args.pieces:
-        jsi.pieces(args.pieces);
+        print jsi.pieces(args.pieces);
  
     elif args.bitfield:
-        jsi.bitfield(args.bitfield);
+        print jsi.bitfield(args.bitfield);
  
     elif args.files:
-        jsi.files(args.files);
-                       
+        print jsi.files(args.files);
+
+    elif args.files_xml:
+        print jsi.files(args.files_xml);
+                              
     elif args.download_links:
-        jsi.download_links(args.download_links);
+        urls = jsi.download_links(args.download_links);
+        for line in urls:
+            print line
+ 
+    elif args.aria2:
+        jsi.aria2_script(args.aria2)
+        
                                
     else:
         print "Invalid action"
