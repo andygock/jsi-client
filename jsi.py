@@ -58,7 +58,8 @@ class JustSeedIt():
     # Default options
     api_key = ""; # Do not use this, use '.justseedit_api_key' file
     url = "https://api.justseed.it"
-    aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=4 --continue --max-connection-per-server=4"
+    aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
+        "--continue --max-connection-per-server=8 --min-split-size=500K"
     
     def __init__(self):
         # Obtain API key
@@ -76,6 +77,7 @@ class JustSeedIt():
         self.debug = 0
         self.dry_run = 0
         self.xml_mode = False
+        self.torrents = {}
     
     def quit(self, message):
         print "Error:", message
@@ -192,7 +194,6 @@ class JustSeedIt():
             print response_xml
             sys.exit()
         return response_xml
-
         
     def pieces(self, infohash):
         if len(infohash) != 40:
@@ -220,6 +221,61 @@ class JustSeedIt():
         result = xmltodict.parse(response_xml)
         return result
 
+    def trackers(self, infohash):
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
+            
+        response_xml = self.api("/torrent/trackers.csp",{'info_hash': infohash })
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
+
+    def peers(self, infohash):
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
+            
+        response_xml = self.api("/torrent/peers.csp",{'info_hash': infohash })
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
+    
+    def start(self, infohash):
+        """ Start torrent(s)
+            to-do: allow multiple id numbers together, or a range of numbers
+        """
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
+        
+        response_xml = self.api("/torrent/start.csp",{'info_hash': infohash })
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
+
+    def stop(self, infohash):
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
+        
+        response_xml = self.api("/torrent/stop.csp",{'info_hash': infohash })
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
+    
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -342,7 +398,7 @@ class JustSeedIt():
             self.info_map = collections.OrderedDict()
                         
             result = xmltodict.parse(xml_response)
-            
+                        
             torrents = result['result']['data']['row']
             
             if 'info_hash' in torrents:
@@ -366,9 +422,12 @@ class JustSeedIt():
         """
         xml_response = self.list_update()
         
+        
         if self.xml_mode:
             print xml_response
             sys.exit()
+            
+        
         
         for id, torrent in self.torrents.items():
             print "[{:>3}] {}".format(torrent['@id'], urllib.unquote(torrent['name']))
@@ -376,10 +435,15 @@ class JustSeedIt():
                 ratio = 0.0
             else:
                 ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
-            print "{:>40} {:>8} {:>12} {:>.2f}".format(torrent['size_as_string'],
+            print "{:>30} {:>8} {:>12} {:>.2f} {}".format(torrent['size_as_string'],
                                                       torrent['percentage_as_decimal'] + "%",
                                                       torrent['elapsed_as_string'],
-                                                      ratio)                         
+                                                      ratio,
+                                                      torrent['status'],)                         
+        
+        result = xmltodict.parse(xml_response)
+        print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
+        
         return
 
     
@@ -401,10 +465,15 @@ if __name__ == "__main__":
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
+    parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
+    parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
+    parser.add_argument("--start", type=str, metavar='INFO-HASH', help='start torrent')
+    parser.add_argument("--stop", type=str, metavar='INFO-HASH', help='stop torrent')
+    parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--aria2", type=str, metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
     
-    parser.add_argument("--xml", action='store_true', help='display in pure XML')
+    parser.add_argument("--xml", action='store_true', help='display result as XML')
     #parser.add_argument("--dummy-data", type=str, metavar='FILE', help='use dummy XML data')
     
     args = parser.parse_args()
@@ -415,7 +484,7 @@ if __name__ == "__main__":
     
     if args.debug:
         jsi.debug = 1
-
+        
     if args.xml:
         jsi.xml_mode = True      
         
@@ -447,10 +516,25 @@ if __name__ == "__main__":
 
     elif args.pieces:
         print jsi.pieces(args.pieces);
+
+    elif args.start:
+        print jsi.start(args.start);
+        
+    elif args.stop:
+        print jsi.stop(args.stop);       
+
+    elif args.delete:
+        print "Not implemented"
+        #print jsi.delete(args.delete);      
  
     elif args.bitfield:
         print jsi.bitfield(args.bitfield);
- 
+
+    elif args.trackers:
+        print jsi.trackers(args.trackers);
+    elif args.peers:
+        print jsi.peers(args.peers);
+         
     elif args.files:
         print jsi.files(args.files);
 
@@ -460,6 +544,9 @@ if __name__ == "__main__":
             print line
  
     elif args.aria2:
+        if args.aria2_options:
+            jsi.aria2_options = args.aria2_options     
+               
         jsi.aria2_script(args.aria2)
         
                                
