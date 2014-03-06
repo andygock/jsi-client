@@ -7,6 +7,8 @@ To run, it requires the the following packages:
 
 They're not usually installed with Python, but can be easily installed using `pip`.
 
+You'll need an API key for use with your justseed.it account. Create a file called `.justseedit_api_key` in the same directory as `jsi.py` or in your home directory with the API key inside.
+
 For help:
 
 	jsi.py -h
