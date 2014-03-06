@@ -1,5 +1,4 @@
-#!/usr/bin/python
-
+#!python
 """
 
 /torrents/list.csp?api_key=[40 character api key]
@@ -76,7 +75,7 @@ class JustSeedIt():
         self.error = False
         self.debug = 0
         self.dry_run = 0
-        self.info_map = {}
+        self.xml_mode = False
     
     def quit(self, message):
         print "Error:", message
@@ -84,13 +83,9 @@ class JustSeedIt():
         sys.exit()
         
     def xml_from_file(self, file):
+        """ Experimental use only """
         f = open(file,'r') 
         xml = f.read()
-        return xml
-    
-    def list_xml(self):
-        xml = self.api("/torrents/list.csp")
-        self.xml_list = xml
         return xml
   
     def api(self, page, data={}):
@@ -136,7 +131,7 @@ class JustSeedIt():
                 # Tell user the response was read
                 sys.stderr.write("OK\n")
 
-            # Store xml for later use, maybe
+            # Store xml for later use, maybe we might use it
             self.xml_response = xml_response
 
         except urllib2.URLError, urllib2.HTTPError:
@@ -149,6 +144,7 @@ class JustSeedIt():
             return xml_response
         else:
             # Server did NOT respond with "SUCCESS"
+            # self.check_server_response() will already display an error message
             self.error = True
             return False
     
@@ -176,7 +172,7 @@ class JustSeedIt():
                 self.quit("API /information.csp did not contain info hash")
 
         else:
-            self.list_only() # Read info from API server
+            self.list_update() # Read info from API server
             if id in self.torrents:
                 if 'info_hash' in self.torrents[id]:
                     return self.torrents[id]['info_hash']
@@ -192,10 +188,11 @@ class JustSeedIt():
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
         return response_xml
-        #print response_xml
-        #result = xmltodict.parse(xml_response)
-        #return result
+
         
     def pieces(self, infohash):
         if len(infohash) != 40:
@@ -248,7 +245,7 @@ class JustSeedIt():
             Return list of direct download urls.
         """
         # grab list info, so we can get the torrent name
-        self.list_only()
+        self.list_update()
 
         # if ID number is given as arg instead of infohash then
         # find out the info hash
@@ -263,10 +260,21 @@ class JustSeedIt():
             # Single file
             urls.append( urllib.unquote(result['result']['data']['row']['url']) )
         else:
-            # Multiple files
-            for row in result['result']['data']['row']:
-                if 'url' in row:
-                    urls.append( urllib.unquote(row['url']) )
+            if len(result['result']['data']['row']):
+                # Multiple files
+                for row in result['result']['data']['row']:
+                    if 'url' in row:
+                        if row['url']: # It could be None if not available, either that or the field is just missing
+                            urls.append( urllib.unquote(row['url']) )
+            else:
+                # No files for this torrent (possible?)
+                sys.stderr.write("This torrent has no files!")
+                sys.exit()
+                
+        if len(urls) == 0:
+            sys.stderr.write("There are no download links availale for this torrent!")
+            sys.exit()
+            
         return urls
 
     def aria2_script(self, infohash, options=None):
@@ -289,103 +297,90 @@ class JustSeedIt():
             print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, self.output_dir, file_path, url)
         return
                 
-    def info_xml(self, infohash):
-        response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
-        print response_xml
-        return
-        
     def info_map(self):
-        self.list_only()
+        self.list_update()
         print " ID INFOHASH"
-        for id, infohash in self.id_to_infohash_map.items():
-            print "{:>3} {}".format(id, infohash)
+        for id, torrent in self.torrents.items():
+            print "{:>3} {}".format(id, torrent['info_hash'])
            
     def add_magnet(self,magnet):
         print "Adding magnet link with ratio {}".format(self.ratio)
         response_xml = self.api("/torrent/add.csp",{'maximum_ratio':str(self.ratio), 'url': magnet })
-        print response_xml
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
         return
     
     def add_torrent_file(self,filename):
-        """ Add .torrent file to system
+        """ Add .torrent file to system.
+            Doesn't return anything.
         """
-        print "Adding from file '{}' with ratio {}".format(filename, self.ratio)
+        print "Adding torrent file '{}' with ratio {}".format(filename, self.ratio)
         
         try:
             f = open(filename,'rb')
             data = f.read()
-            
         except IOError:
-            print "Could not open file '{0}'".format(filename)
+            sys.stderr.write("Could not open file '{0}'".format(filename))
             return
-        
-        try:
-            xml_response = self.api("/torrent/add.csp",{'torrent_file':data, 'maximum_ratio':str(self.ratio)})
-            self.xml_response = xml_response
-        except urllib2.URLError, urllib2.HTTPError:
-            print "Could not communicate with API server, or response from it was unexpected"
-            sys.exit()
-        
+
+        self.api("/torrent/add.csp",{'torrent_file':data, 'maximum_ratio':str(self.ratio)})
+        if self.xml_mode:
+            print response_xml
+            sys.exit()        
         return
 
-    def list_only(self):
-        """ Read list information and save in self.torrents """
+    def list_update(self):
+        """ Read list information and save in self.torrents
+        """
         xml_response = self.api("/torrents/list.csp")
-        #print xml_response
         if xml_response:
-            result = xmltodict.parse(xml_response)
-            torrents = result['result']['data']['row']
             
             # Make new maps
             self.id_to_infohash_map = collections.OrderedDict()
             self.torrents = collections.OrderedDict()
             self.info_map = collections.OrderedDict()
+                        
+            result = xmltodict.parse(xml_response)
             
-            #pprint(torrents)
+            torrents = result['result']['data']['row']
             
-            for torrent in torrents:
-                
-                
-                self.id_to_infohash_map[torrent['@id']] = torrent['info_hash']
-                
-                self.torrents[torrent['@id']] = { 'info_hash': torrent['info_hash'],
-                                                  'name': torrent['name'],
-                                                  'label': torrent['label'],
-                                                  'status': torrent['status'] }         
+            if 'info_hash' in torrents:
+                # Only 1 entry
+                self.id_to_infohash_map[torrent['@id']] = torrents['info_hash']
+                self.torrents[torrent['@id']] = torrents
+            else:
+                # More than 1 entry
+                if len(torrents):
+                    for torrent in torrents:
+                        self.id_to_infohash_map[torrent['@id']] = torrent['info_hash']
+                        self.torrents[torrent['@id']] = torrent
+                else:
+                    # No entries, leave var maps as empty 
+                    pass
         
-        return
+        return xml_response
                    
     def list(self):
         """ Show torrents in pretty format
         """
+        xml_response = self.list_update()
         
-        print "Getting list of torrents..."
+        if self.xml_mode:
+            print xml_response
+            sys.exit()
         
-        #xml_response = self.xml_from_file("list.xml")
-        xml_response = self.api("/torrents/list.csp")
-        if xml_response:
-            result = xmltodict.parse(xml_response)
-            #print result
-            #return
-        
-            torrents = result['result']['data']['row']
-            self.id_to_infohash_map = collections.OrderedDict()
-            for torrent in torrents:
-                self.id_to_infohash_map[torrent['@id']] = torrent['info_hash']
-                
-                print "[{:>3}] {}".format(torrent['@id'], urllib.unquote(torrent['name']))
-                
-                if float(torrent['downloaded_as_bytes']) == 0:
-                    ratio = 0.0
-                else:
-                    ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])
-                #print ratio
-                
-                print "{:>40} {:>8} {:>12} {:>.2f}".format(torrent['size_as_string'],
-                                                          torrent['percentage_as_decimal'] + "%",
-                                                          torrent['elapsed_as_string'],
-                                                          ratio)
-                #print json.dumps(result['result']['data'], indent=4)
+        for id, torrent in self.torrents.items():
+            print "[{:>3}] {}".format(torrent['@id'], urllib.unquote(torrent['name']))
+            if float(torrent['downloaded_as_bytes']) == 0:
+                ratio = 0.0
+            else:
+                ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
+            print "{:>40} {:>8} {:>12} {:>.2f}".format(torrent['size_as_string'],
+                                                      torrent['percentage_as_decimal'] + "%",
+                                                      torrent['elapsed_as_string'],
+                                                      ratio)                         
+        return
 
     
 if __name__ == "__main__":
@@ -396,7 +391,6 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--torrent-file", type=str, metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("-i", "--info", type=str, metavar='INFOHASH', help='show info for torrent (by infohash or ID)')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
-    parser.add_argument("--list-xml", action='store_true', help='list torrents in raw XML format')
     parser.add_argument("--download-links", type=str, metavar='INFO-HASH', help='get download links')
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t or -m)')
@@ -407,9 +401,10 @@ if __name__ == "__main__":
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
-    parser.add_argument("--files-xml", type=str, metavar='INFO-HASH', help='get files info (XML)')
     parser.add_argument("--aria2", type=str, metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
+    
+    parser.add_argument("--xml", action='store_true', help='display in pure XML')
     #parser.add_argument("--dummy-data", type=str, metavar='FILE', help='use dummy XML data')
     
     args = parser.parse_args()
@@ -420,6 +415,9 @@ if __name__ == "__main__":
     
     if args.debug:
         jsi.debug = 1
+
+    if args.xml:
+        jsi.xml_mode = True      
         
     if args.dry:
         jsi.dry_run = 1
@@ -441,9 +439,6 @@ if __name__ == "__main__":
     elif args.list:
         jsi.list()
         
-    elif args.list_xml:
-        print jsi.list_xml()
-        
     elif args.info:
         jsi.info(args.info);
  
@@ -459,9 +454,6 @@ if __name__ == "__main__":
     elif args.files:
         print jsi.files(args.files);
 
-    elif args.files_xml:
-        print jsi.files(args.files_xml);
-                              
     elif args.download_links:
         urls = jsi.download_links(args.download_links);
         for line in urls:
