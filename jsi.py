@@ -1,4 +1,4 @@
-#!python
+#!/usr/bin/python
 
 """
 
@@ -23,6 +23,10 @@ or a .torrent file as a POST request where the file parameter is named "torrent_
 import sys
 import urllib, urllib2, xmltodict, json, argparse, poster, collections, re
 from pprint import pprint
+
+#from __future__ import print_function
+#def warning(*objs):
+#    print("WARNING: ", *objs, file=sys.stderr)
 
 class bcolors:
     HEADER = '\033[95m'
@@ -120,86 +124,134 @@ class JustSeedIt():
                 print hexdump("".join(post_data))
                 return "<data>Dry run mode: This is not actual API server response.</data>"
             
-            req = urllib2.Request(self.url + page, post_data, headers)
-            
+            if self.debug:
+                sys.stderr.write('Requesting from '+self.url + page + " ... ")
+
+            # Form and ake the actual request
+            req = urllib2.Request(self.url + page, post_data, headers)            
             response = urllib2.urlopen(req)
-            xml_response = response.read()
+            xml_response = response.read() # Read server response
+
+            if self.debug:
+                # Tell user the response was read
+                sys.stderr.write("OK\n")
+
+            # Store xml for later use, maybe
             self.xml_response = xml_response
 
         except urllib2.URLError, urllib2.HTTPError:
-            print "URL or HTTP error"
+            sys.stderr.write("Error: URL or HTTP error\n")
             sys.exit()
         
         if self.check_server_response(xml_response):
+            # Server responded with "SUCCESS"
             self.error = False
-            #if self.debug:
-            #    print xml_response
             return xml_response
         else:
+            # Server did NOT respond with "SUCCESS"
             self.error = True
             return False
     
     def check_server_response(self,xml_data):
+        """ Check server reponse is valid and return True or False. Error is printed to
+            stderr if response is not "SUCCESS".
+        """
         result = xmltodict.parse(xml_data)
         if result['result']['status'] == 'SUCCESS':
             return True
         else:
             error = urllib.unquote(result['result']['message'])
-            print "Warning: ",error
+            #print "Warning: ",error
+            sys.stderr.write('Warning: '+error+"\n")
             return False
             #self.quit(error)
     
     def id_to_infohash(self, id):
-        #pprint(self.id_to_infohash_map)
-        try:
-            self.list_only()
-            return self.id_to_infohash_map[id]
-        except KeyError:
-            self.quit("No such ID number of '{}'".format(id))
+        """ Find the info hash, when given a ID """
+        #print self.torrents
+        if id in self.torrents:
+            if 'info_hash' in self.torrents[id]:
+                return self.torrents[id]['info_hash']
+            else:
+                self.quit("API /information.csp did not contain info hash")
+
+        else:
+            self.list_only() # Read info from API server
+            if id in self.torrents:
+                if 'info_hash' in self.torrents[id]:
+                    return self.torrents[id]['info_hash']
+                else:
+                    self.quit("API /information.csp did not contain info hash")
+            else:
+                self.quit("No such ID number of '{}'".format(id))
     
     def info(self, infohash):
+        """ Grab info about a torrent
+        """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
-        print response_xml
-        
-        result = xmltodict.parse(xml_response)
-        return
-        #result['data']
+        return response_xml
+        #print response_xml
+        #result = xmltodict.parse(xml_response)
+        #return result
         
     def pieces(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/pieces.csp",{'info_hash': infohash })
-        return response_xml
+        
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
 
     def bitfield(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/bitfield.csp",{'info_hash': infohash })
-        return response_xml
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
 
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
-        #print response_xml
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
         result = xmltodict.parse(response_xml)
-        return response_xml
+        return result
  
     def files_xml(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
-        result = xmltodict.parse(response_xml)
         return response_xml
     
     def download_links(self, infohash):
+        """ Get download links fsor infohash or ID number.
+            Return list of direct download urls.
+        """
+        # grab list info, so we can get the torrent name
+        self.list_only()
+
+        # if ID number is given as arg instead of infohash then
+        # find out the info hash
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
         
@@ -210,7 +262,6 @@ class JustSeedIt():
         if 'url' in result['result']['data']['row']:
             # Single file
             urls.append( urllib.unquote(result['result']['data']['row']['url']) )
-            
         else:
             # Multiple files
             for row in result['result']['data']['row']:
@@ -218,19 +269,24 @@ class JustSeedIt():
                     urls.append( urllib.unquote(row['url']) )
         return urls
 
-    def aria2_script(self, infohash):
+    def aria2_script(self, infohash, options=None):
+        """ Generate a aria2 download script for selected infohash or id number
+        """
+
+        # get download links
         urls = self.download_links(infohash)
-        #pprint(self.id_to_infohash_map)
+
+        if not options:
+            options = self.aria2_options
+
         for url in urls:
             file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
-            #print file_path
             self.output_dir = 'd:/Downloads/justseed.it Downloads/'
-            #pprint(self.torrents)
             if infohash in self.torrents:
                 if 'name' in self.torrents[infohash]:
                     self.output_dir += self.torrents[infohash]['name']
             
-            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(self.aria2_options, self.output_dir, file_path, url)
+            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, self.output_dir, file_path, url)
         return
                 
     def info_xml(self, infohash):
@@ -273,6 +329,7 @@ class JustSeedIt():
         return
 
     def list_only(self):
+        """ Read list information and save in self.torrents """
         xml_response = self.api("/torrents/list.csp")
         #print xml_response
         if xml_response:
@@ -294,26 +351,7 @@ class JustSeedIt():
                 self.torrents[torrent['@id']] = { 'info_hash': torrent['info_hash'],
                                                   'name': torrent['name'],
                                                   'label': torrent['label'],
-                                                  'status': torrent['status'] }
-                
-                """
-                self.info_map[torrent['@id']]['name'] = torrent['name']
-                
-                #pprint(self.info_map)
-                
-                self.info_map[torrent['@id']]['label'] = torrent['label']
-                self.info_map[torrent['@id']]['status'] = torrent['status']
-                
-                self.info_map[torrent['info_hash']]['name'] = torrent['name']
-                self.info_map[torrent['info_hash']]['label'] = torrent['label']
-                self.info_map[torrent['info_hash']]['status'] = torrent['status']
-                """
-                
-                                
-            #if self.debug:
-            #pprint(self.torrents)
-        
-            
+                                                  'status': torrent['status'] }         
         
         return
                    
