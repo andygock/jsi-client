@@ -59,7 +59,8 @@ class JustSeedIt():
     api_key = ""; # Do not use this, use '.justseedit_api_key' file
     url = "https://api.justseed.it"
     aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
-        "--continue --max-connection-per-server=8 --min-split-size=500K"
+        "--continue --max-connection-per-server=8 --min-split-size=1M"
+    output_dir = 'd:/Downloads/justseed.it Downloads/'
     
     def __init__(self):
         # Obtain API key
@@ -205,8 +206,14 @@ class JustSeedIt():
             
         return result
 
-    def urldecode_to_ascii(self,s):
-        return urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii','replace')
+    def urldecode_to_ascii(self,s,error_opt='replace'):
+        
+        output = urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii',error_opt)
+        
+        # Replace '?' with '-'
+        output = re.sub('\?','-',output)
+        
+        return output
         
     def pieces(self, infohash):
         if len(infohash) != 40:
@@ -357,12 +364,14 @@ class JustSeedIt():
             options = self.aria2_options
 
         for url in urls:
-            file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
-            self.output_dir = 'd:/Downloads/justseed.it Downloads/'
+            #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
+            file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/','',url))
+            
             if infohash in self.torrents:
                 if 'name' in self.torrents[infohash]:
                     self.output_dir += self.torrents[infohash]['name']
-            
+                    
+            self.output_dir = self.urldecode_to_ascii(self.output_dir)
             print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, self.output_dir, file_path, url)
         return
                 
