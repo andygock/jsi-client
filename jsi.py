@@ -44,6 +44,13 @@ class bcolors:
         self.FAIL = ''
         self.ENDC = ''
 
+def is_number(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+    
 def hexdump(src, length=16):
     FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
     lines = []
@@ -215,9 +222,14 @@ class JustSeedIt():
             if k == '@name':
                 continue
             if v:
-                print k+":", self.urldecode_to_ascii(v)
+                if k == 'name':
+                    # Replace unicode chars with '-' for torrent name only
+                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v,'replace'))
+                else:
+                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v,'strict'))
             else:
-                print k+":"
+                #print k+":"
+                print "{:>24}:".format(k)
             
         return result
 
@@ -226,7 +238,8 @@ class JustSeedIt():
         output = urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii',error_opt)
         
         # Replace '?' with '-'
-        output = re.sub('\?','-',output)
+        if error_opt == 'replace':
+            output = re.sub('\?','-',output)
         
         return output
         
@@ -269,6 +282,23 @@ class JustSeedIt():
         result = xmltodict.parse(response_xml)
         return result
 
+    def set_torrent_ratio(self, infohash, ratio="1.00"):
+        if len(infohash) != 40:
+            infohash = self.id_to_infohash(infohash)
+
+        if not is_number(ratio):
+            sys.stderr.write("Error: Ratio provided '{}' is not numeric.".format(ratio))
+            return
+            
+        response_xml = self.api("/torrent/set_maximum_ratio.csp",{'info_hash': infohash, 'maximum_ratio': ratio })
+
+        if self.xml_mode:
+            print response_xml
+            sys.exit()
+
+        result = xmltodict.parse(response_xml)
+        return result
+ 
     def peers(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -493,13 +523,14 @@ class JustSeedIt():
 if __name__ == "__main__":
     
     # Set up CLI arguments
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client', epilog='')
     parser.add_argument("-m", "--magnet", help="add torrent using magnet link", metavar='MAGNET-TEXT', type=str, nargs=1)
     parser.add_argument("-t", "--torrent-file", type=str, metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("-i", "--info", type=str, metavar='INFOHASH', help='show info for torrent (by infohash or ID)')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("--download-links", type=str, metavar='INFO-HASH', help='get download links')
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
+    parser.add_argument("--set-torrent-ratio", type=str, metavar=('INFO-HASH','RATIO'), nargs=2, help='set maximum ratio for torrent')
     parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t or -m)')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
@@ -558,6 +589,12 @@ if __name__ == "__main__":
     elif args.infomap:
         jsi.info_map();
 
+    elif args.set_torrent_ratio:
+        # jsi.py --set-torrent-ratio ID RATIO
+        jsi.set_torrent_ratio(args.set_torrent_ratio[0], args.set_torrent_ratio[1]);
+        if not jsi.error:
+            sys.stderr.write("Ratio of selected torrent was successfully changed.")
+
     elif args.pieces:
         print jsi.pieces(args.pieces);
 
@@ -592,10 +629,9 @@ if __name__ == "__main__":
             jsi.aria2_options = args.aria2_options     
                
         jsi.aria2_script(args.aria2)
-        
                                
     else:
-        print "Invalid action"
+        parser.print_help()
         
     if args.pause:
         raw_input("Press Enter to continue...")
