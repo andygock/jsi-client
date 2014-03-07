@@ -405,15 +405,19 @@ class JustSeedIt():
             options = self.aria2_options
 
         for url in urls:
+            
             #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
             file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/','',url))
             
+            output_dir = self.output_dir
+            
             if infohash in self.torrents:
                 if 'name' in self.torrents[infohash]:
-                    self.output_dir += self.torrents[infohash]['name']
+                   output_dir += self.torrents[infohash]['name']
                     
-            self.output_dir = self.urldecode_to_ascii(self.output_dir)
-            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, self.output_dir, file_path, url)
+            output_dir = self.urldecode_to_ascii(output_dir)
+            
+            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
         return
                 
     def info_map(self):
