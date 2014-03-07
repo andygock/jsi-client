@@ -426,11 +426,15 @@ class JustSeedIt():
         if self.xml_mode:
             print xml_response
             sys.exit()
-            
-        
         
         for id, torrent in self.torrents.items():
-            print "[{:>3}] {}".format(torrent['@id'], urllib.unquote(torrent['name']))
+            # 'name' is a urlencoded UTF-8 string
+            # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
+            
+            name = urllib.unquote( torrent['name'].encode('ascii') )
+            name = name.decode('utf-8').encode('ascii','replace')
+            
+            print "[{:>3}] {}".format(torrent['@id'], name)
             if float(torrent['downloaded_as_bytes']) == 0:
                 ratio = 0.0
             else:
