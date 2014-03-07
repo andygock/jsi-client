@@ -182,10 +182,8 @@ class JustSeedIt():
             return True
         else:
             error = urllib.unquote(result['result']['message'])
-            #print "Warning: ",error
             sys.stderr.write('Warning: '+error+"\n")
             return False
-            #self.quit(error)
     
     def id_to_infohash(self, id):
         """ Find the info hash, when given a ID """
@@ -228,19 +226,17 @@ class JustSeedIt():
                 else:
                     print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v,'strict'))
             else:
-                #print k+":"
+                # No value available for this key
                 print "{:>24}:".format(k)
             
         return result
 
     def urldecode_to_ascii(self,s,error_opt='replace'):
-        
         output = urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii',error_opt)
         
         # Replace '?' with '-'
         if error_opt == 'replace':
             output = re.sub('\?','-',output)
-        
         return output
         
     def pieces(self, infohash):
@@ -488,8 +484,6 @@ class JustSeedIt():
         """ Show torrents in pretty format
         """
         xml_response = self.list_update()
-        
-        
         if self.xml_mode:
             print xml_response
             sys.exit()
@@ -497,12 +491,7 @@ class JustSeedIt():
         for id, torrent in self.torrents.items():
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
-            
-            #name = urllib.unquote( torrent['name'].encode('ascii') )
-            #name = name.decode('utf-8').encode('ascii','replace')
-            
             name = self.urldecode_to_ascii(torrent['name'])
-            
             print "[{:>3}] {}".format(torrent['@id'], name)
             if float(torrent['downloaded_as_bytes']) == 0:
                 ratio = 0.0
@@ -516,9 +505,7 @@ class JustSeedIt():
         
         result = xmltodict.parse(xml_response)
         print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
-        
         return
-
     
 if __name__ == "__main__":
     # Set up CLI arguments
@@ -570,7 +557,7 @@ if __name__ == "__main__":
     if args.ratio:
         jsi.ratio = args.ratio
     
-    # Perform main action
+    # Perform main actions
     
     if args.magnet:
         jsi.add_magnet(args.magnet[0])
