@@ -193,7 +193,20 @@ class JustSeedIt():
         if self.xml_mode:
             print response_xml
             sys.exit()
-        return response_xml
+
+        result = xmltodict.parse(response_xml)
+        for k,v in result['result']['data'].items():
+            if k == '@name':
+                continue
+            if v:
+                print k+":", self.urldecode_to_ascii(v)
+            else:
+                print k+":"
+            
+        return result
+
+    def urldecode_to_ascii(self,s):
+        return urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii','replace')
         
     def pieces(self, infohash):
         if len(infohash) != 40:
@@ -431,8 +444,10 @@ class JustSeedIt():
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
             
-            name = urllib.unquote( torrent['name'].encode('ascii') )
-            name = name.decode('utf-8').encode('ascii','replace')
+            #name = urllib.unquote( torrent['name'].encode('ascii') )
+            #name = name.decode('utf-8').encode('ascii','replace')
+            
+            name = self.urldecode_to_ascii(torrent['name'])
             
             print "[{:>3}] {}".format(torrent['@id'], name)
             if float(torrent['downloaded_as_bytes']) == 0:
