@@ -20,7 +20,8 @@ or a .torrent file as a POST request where the file parameter is named "torrent_
 """
 
 import sys
-import urllib, urllib2, xmltodict, json, argparse, poster, collections, re
+import urllib, urllib2, xmltodict, json, argparse, poster, collections
+import re, zlib, StringIO, gzip
 from pprint import pprint
 
 #from __future__ import print_function
@@ -79,6 +80,7 @@ class JustSeedIt():
         self.dry_run = 0
         self.xml_mode = False
         self.torrents = {}
+        self.compress = False
     
     def quit(self, message):
         print "Error:", message
@@ -125,10 +127,23 @@ class JustSeedIt():
             if self.debug:
                 sys.stderr.write('Requesting from '+self.url + page + " ... ")
 
-            # Form and ake the actual request
-            req = urllib2.Request(self.url + page, post_data, headers)            
+            # Form and make the actual request
+            req = urllib2.Request(self.url + page, post_data, headers)
+            
+            if self.compress:
+                # Tell server we can read gzip encoded stream
+                req.add_header('Accept-Encoding', 'gzip')
+                
             response = urllib2.urlopen(req)
-            xml_response = response.read() # Read server response
+            
+            if response.info().get('Content-Encoding') == 'gzip':
+                # Server sent gzip encoded stream, uncompress it
+                buffer = StringIO.StringIO(response.read())
+                f = gzip.GzipFile(fileobj=buffer)
+                xml_response = f.read()
+            else:
+                # Normal uncompressed stream
+                xml_response = response.read() # Read server response
 
             if self.debug:
                 # Tell user the response was read
@@ -502,11 +517,9 @@ if __name__ == "__main__":
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
     
     parser.add_argument("--xml", action='store_true', help='display result as XML')
-    #parser.add_argument("--dummy-data", type=str, metavar='FILE', help='use dummy XML data')
+    parser.add_argument("--compress", '-z', action='store_true', help='request api server to use gzip encoding')
     
     args = parser.parse_args()
-    #print args
-    #sys.exit()
     
     jsi = JustSeedIt();
     
@@ -515,6 +528,9 @@ if __name__ == "__main__":
         
     if args.xml:
         jsi.xml_mode = True      
+
+    if args.compress:
+        jsi.compress = True    
         
     if args.dry:
         jsi.dry_run = 1
