@@ -1,11 +1,26 @@
 # justseedit cli client
 
-To run, it requires the the following packages:
+Command line client for [justseed.it](https://justseed.it) seedbox service.
 
-- xmltodict
-- poster
+## Installation
 
-They're not usually installed with Python, but can be easily installed using `pip`.
+### Using source
+
+To run, it requires the the following packages which are in addition to those standard packages which come with Python.:
+
+- [xmltodict](http://pypi.python.org/pypi/xmltodict/)
+- [poster](http://pypi.python.org/pypi/poster/)
+- [bencode](http://pypi.python.org/pypi/bencode/)
+
+They can be easily installed using `pip`. Example `pip install xmltodict` to install xmltodict.
+
+Windows users can use [pip-Win](https://sites.google.com/site/pydatalog/python/pip-for-windows) which makes it very easy to install python packages
+
+### Using Windows compiled binary
+
+Coming soon
+
+## Set up API key
 
 You'll need an API key for use with your justseed.it account. Create a file called `.justseedit_api_key` in the same directory as `jsi.py` or in your home directory with the API key inside.
 
@@ -13,43 +28,40 @@ For help:
 
 	jsi.py -h
 	
-Dump of help options:
+## Examples of usage
 
-	usage: jsi.py [-h] [-m MAGNET-TEXT] [-t TORRENT-FILE] [-i INFOHASH] [-l]
-				  [--download-links INFO-HASH] [-p] [-r RATIO] [-v] [-d] [--dry]
-				  [--infomap] [--pieces INFO-HASH] [--bitfield INFO-HASH]
-				  [--files INFO-HASH] [--trackers INFO-HASH] [--peers INFO-HASH]
-				  [--start INFO-HASH] [--stop INFO-HASH] [--delete INFO-HASH]
-				  [--aria2 INFO-HASH] [--aria2-options OPTIONS] [--xml]
+Add a single torrent file with maximum ratio of 2.0
 
-	optional arguments:
-	  -h, --help            show this help message and exit
-	  -m MAGNET-TEXT, --magnet MAGNET-TEXT
-							add torrent using magnet link
-	  -t TORRENT-FILE, --torrent-file TORRENT-FILE
-							add torrent with .torrent file
-	  -i INFOHASH, --info INFOHASH
-							show info for torrent (by infohash or ID)
-	  -l, --list            list torrents
-	  --download-links INFO-HASH
-							get download links
-	  -p, --pause           pause when finished
-	  -r RATIO, --ratio RATIO
-							set maximum ratio (used in conjunction with -t or -m)
-	  -v, --verbose         verbose mode
-	  -d, --debug           debug mode
-	  --dry                 dry run
-	  --infomap             show ID to infohash map
-	  --pieces INFO-HASH    get pieces info
-	  --bitfield INFO-HASH  get bitfield info
-	  --files INFO-HASH     get files info
-	  --trackers INFO-HASH  get trackers info
-	  --peers INFO-HASH     get peers info
-	  --start INFO-HASH     start torrent
-	  --stop INFO-HASH      stop torrent
-	  --delete INFO-HASH    delete torrent
-	  --aria2 INFO-HASH     generate aria2 script for downloading
-	  --aria2-options OPTIONS
-							options to pass to aria2c
-	  --xml                 display result as XML
-	  
+	wget http://cdimage.debian.org/debian-cd/7.4.0/amd64/bt-cd/debian-7.4.0-amd64-netinst.iso.torrent
+	jsi.py -r 2.0 -t debian-7.4.0-amd64-netinst.iso.torrent
+	
+Check current torrents in system:
+
+	jsi.py --list
+	
+Add multiple 3 torrent files at the same time, with default ratio:
+
+	jsi.py -t debian-7.4.0-amd64-CD-1.iso.torrent debian-7.4.0-amd64-CD-2.iso.torrent debian-7.4.0-amd64-CD-3.iso.torrent
+	
+Add all .torrent files from current directory with maximum ratio of 1.0
+
+	jsi.py -r 1.0 -t *.torrent
+	
+View download links for torrent with ID number 5:
+
+	jsi.py --download-links 5
+
+Save download links for torrent with ID number 5 to file `links.txt`:
+
+	jsi.py --download-links 5 > links.txt
+	
+Generate aria2 download links for torrent with ID 5 and save to file `aria2-script`
+
+	jsi.py --aria2 5 > aria2-script
+	
+(and view, then run the aria2-script)
+
+	cat aria2-script
+	sh aria2-script
+	
+	
