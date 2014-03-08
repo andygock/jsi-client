@@ -1,4 +1,4 @@
-# justseedit cli client
+# justseed.it cli client
 
 Command line client for [justseed.it](https://justseed.it) seedbox service.
 

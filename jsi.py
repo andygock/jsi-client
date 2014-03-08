@@ -627,7 +627,7 @@ class JustSeedIt():
     
 if __name__ == "__main__":
     # Set up CLI arguments
-    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version '+ JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown the first column of the --list output.')
+    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version '+ JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown in the first column of the --list output.')
     
     parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
