@@ -412,7 +412,7 @@ class JustSeedIt():
                 sys.exit()
                 
         if len(urls) == 0:
-            sys.stderr.write("There are no download links availale for this torrent!")
+            sys.stderr.write("There are no download links available for this torrent!")
             sys.exit()
             
         return urls
@@ -454,7 +454,7 @@ class JustSeedIt():
             Doesn't return anything
         """
         for magnet in magnets:
-            sys.stder.write("Adding magnet link with ratio {}".format(self.ratio))
+            sys.stder.write("Adding magnet link with ratio {}\n".format(self.ratio))
             
             # Check magnet data is valid
             # @todo
