@@ -49,22 +49,22 @@ Check current torrents in system:
 Add multiple 3 torrent files at the same time, with default ratio:
 
 	jsi.py -t FILE1 FILE2 FILE3
-	
+
 Add all .torrent files from current directory with maximum ratio of 1.0
 
 	jsi.py -r 1.0 -t *.torrent
 	
-View download links for torrent with ID number 5:
+View download links for torrent with ID #5:
 
 	jsi.py --download-links 5
 
-Save download links for torrent with ID number 5 to file `links.txt`:
+Save download links for torrent with ID #5 and #7 to file `links.txt`:
 
-	jsi.py --download-links 5 > links.txt
+	jsi.py --download-links 5 7 > links.txt
 	
-Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID 5 and save to file `aria2-script`
+Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID #5 and #7, and save to file `aria2-script`
 
-	jsi.py --aria2 5 > aria2-script
+	jsi.py --aria2 5 7 > aria2-script
 	
 And then view and run the aria2-script commands:
 
