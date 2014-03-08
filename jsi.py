@@ -19,7 +19,7 @@ or a .torrent file as a POST request where the file parameter is named "torrent_
 
 """
 
-import sys
+import sys, os
 import urllib, urllib2, xmltodict, json, argparse, poster, collections
 import re, zlib, StringIO, gzip
 from pprint import pprint
@@ -70,17 +70,37 @@ class JustSeedIt():
         "--continue --max-connection-per-server=8 --min-split-size=1M"
     output_dir = 'd:/Downloads/justseed.it Downloads/'
     
-    def __init__(self):
-        # Obtain API key
-        try:
-            f = open('.justseedit_api_key','r') 
-            key = f.read()
-            self.api_key = key.strip()
-        except IOError:
-            # Could not read api key from file
-            # USe default api_key, which is actually an empty string
-            pass
+    def __init__(self, api_key=''):
+        self.api_key = "" # start off blank
+
+        if self.api_key != "":
+            self.api_key = api_key
+            #sys.stderr.write("Read API key from constructor")
+            
+        else:
+            # Get homedir
+            self.homedir = os.path.expanduser("~")
+            
+            # Obtain API key
+            for keyfile in (self.homedir + '/.justseedit_apikey', '/.justseedit_apikey'):
+                # Try different locations for key file
+                try:
+                    f = open(keyfile,'r') 
+                    key = f.read()
+                    self.api_key = key.strip()
+                    #sys.stderr.write("Read API key from '{}'".format(keyfile))
+                    break
+                except IOError:
+                    # Could not read api key from file
+                    # Use default api_key, which is actually an empty string
+                    continue
         
+        if self.api_key == "":
+            # No found in file searches above
+            sys.stderr.write("No API key file could be found or was specified")
+            sys.exit()
+        
+        # Set default configs, these may be changed later
         self.ratio = 1.0
         self.error = False
         self.debug = 0
@@ -516,6 +536,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client', epilog='')
     parser.add_argument("--aria2", type=str, metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
+    parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--compress", '-z', action='store_true', help='request api server to use gzip encoding')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
@@ -541,7 +562,10 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    jsi = JustSeedIt();
+    if args.api_key:
+        jsi = JustSeedIt(args.api_key);
+    else:
+        jsi = JustSeedIt();
     
     if args.debug:
         jsi.debug = 1
