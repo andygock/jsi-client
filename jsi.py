@@ -112,12 +112,17 @@ class JustSeedIt():
         self.xml_mode = False
         self.torrents = {}
         self.compress = False
+        self.edit_opts = []
     
     def quit(self, message):
         print "Error:", message
         print "Quitting."
         sys.exit()
         
+    def edit_append(self, option):
+        self.edit_opts.append(option)
+        return
+    
     def xml_from_file(self, file):
         """ Experimental use only """
         f = open(file,'r') 
@@ -210,13 +215,14 @@ class JustSeedIt():
             return False
     
     def id_to_infohash(self, id):
-        """ Find the info hash, when given a ID """
+        """ Find the info hash, when given a ID, returns infohash """
         #print self.torrents
         if id in self.torrents:
             if 'info_hash' in self.torrents[id]:
                 return self.torrents[id]['info_hash']
             else:
-                self.quit("API /information.csp did not contain info hash")
+                sys.stderr.write("No info hash available for ID {}\n".format(id))
+                return False
 
         else:
             self.list_update() # Read info from API server
@@ -224,15 +230,19 @@ class JustSeedIt():
                 if 'info_hash' in self.torrents[id]:
                     return self.torrents[id]['info_hash']
                 else:
-                    self.quit("API /information.csp did not contain info hash")
+                    sys.stderr.write("No info hash available for ID {}\n".format(id))
+                    return False
             else:
-                self.quit("No such ID number of '{}'".format(id))
+                sys.stderr.write("No such ID number of '{}'\n".format(id))
+                return False
     
     def info(self, infohash):
         """ Grab info about a torrent
         """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
+            if not infohash:
+                return
             
         response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
         if self.xml_mode:
@@ -266,7 +276,8 @@ class JustSeedIt():
     def pieces(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-            
+            if not infohash:
+                return            
         response_xml = self.api("/torrent/pieces.csp",{'info_hash': infohash })
         
         if self.xml_mode:
@@ -279,7 +290,9 @@ class JustSeedIt():
     def bitfield(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-            
+            if not infohash:
+                return
+                        
         response_xml = self.api("/torrent/bitfield.csp",{'info_hash': infohash })
 
         if self.xml_mode:
@@ -301,28 +314,49 @@ class JustSeedIt():
 
         result = xmltodict.parse(response_xml)
         return result
-
-    def set_torrent_ratio(self, infohash, ratio="1.00"):
-        if len(infohash) != 40:
-            infohash = self.id_to_infohash(infohash)
-
-        if not is_number(ratio):
-            sys.stderr.write("Error: Ratio provided '{}' is not numeric.".format(ratio))
-            return
+    
+    def edit(self, infohashes):
+        """ Edit torrent. Can change ratio or name
+        """
+        
+        parameters = self.edit_opts
+        
+        self.list_update()
+        
+        for infohash in infohashes:
+            id = False
+            if len(infohash) != 40:
+                id = infohash
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+    
+            if 'ratio' in parameters:
+                # ratio already set in self.ratio, given my --ratio arg
+                if id:
+                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(id,self.ratio))
+                else:
+                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(infohash,self.ratio))
+                    
+                response_xml = self.api("/torrent/set_maximum_ratio.csp",{'info_hash': infohash, 'maximum_ratio': self.ratio })
+                if self.xml_mode:
+                    print response_xml            
             
-        response_xml = self.api("/torrent/set_maximum_ratio.csp",{'info_hash': infohash, 'maximum_ratio': ratio })
-
+            if 'name' in parameters:
+                sys.stderr.write("Not implemented.\n");
+           
+        
         if self.xml_mode:
-            print response_xml
             sys.exit()
+            
+        return
 
-        result = xmltodict.parse(response_xml)
-        return result
- 
     def peers(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-            
+            if not infohash:
+                return
+                       
         response_xml = self.api("/torrent/peers.csp",{'info_hash': infohash })
 
         if self.xml_mode:
@@ -338,7 +372,9 @@ class JustSeedIt():
         """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-        
+            if not infohash:
+                return
+                    
         response_xml = self.api("/torrent/start.csp",{'info_hash': infohash })
 
         if self.xml_mode:
@@ -351,7 +387,9 @@ class JustSeedIt():
     def stop(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-        
+            if not infohash:
+                return
+                    
         response_xml = self.api("/torrent/stop.csp",{'info_hash': infohash })
 
         if self.xml_mode:
@@ -364,7 +402,9 @@ class JustSeedIt():
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-            
+            if not infohash:
+                return
+                        
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
 
         if self.xml_mode:
@@ -377,7 +417,9 @@ class JustSeedIt():
     def files_xml(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-            
+            if not infohash:
+                return
+                        
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
         return response_xml
     
@@ -392,7 +434,9 @@ class JustSeedIt():
         # find out the info hash
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
-        
+            if not infohash:
+                return
+                    
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
         #response_xml = self.xml_from_file('files.xml') # debug
         result = xmltodict.parse(response_xml)
@@ -548,7 +592,7 @@ class JustSeedIt():
                                                       torrent['elapsed_as_string'],
                                                       ratio,
                                                       float(torrent['maximum_ratio_as_decimal']),
-                                                      torrent['status'],)                         
+                                                      torrent['status'])                         
         
         result = xmltodict.parse(xml_response)
         print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
@@ -566,18 +610,19 @@ if __name__ == "__main__":
     parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", type=str, metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
+    parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
     parser.add_argument("-i", "--info", type=str, metavar='INFOHASH', help='show info for torrent (by infohash or ID)')
     parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
+    parser.add_argument("--name", type=float, help='set name (used with -e)')
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
-    parser.add_argument("--set-torrent-ratio", type=str, metavar=('INFO-HASH','RATIO'), nargs=2, help='set maximum ratio for torrent')
     parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
-    parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t or -m)')
+    parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t, -m or -e)')
     parser.add_argument("--start", type=str, metavar='INFO-HASH', help='start torrent')
     parser.add_argument("--stop", type=str, metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
@@ -609,7 +654,11 @@ if __name__ == "__main__":
         
     if args.ratio:
         jsi.ratio = args.ratio
-    
+        jsi.edit_append('ratio')
+
+    if args.name:
+        sys.stderr.write("--name is not implemented")
+        
     # Perform main actions
     
     if args.magnet:
@@ -623,15 +672,12 @@ if __name__ == "__main__":
         
     elif args.info:
         jsi.info(args.info);
+
+    elif args.edit:
+        jsi.edit(args.edit);
  
     elif args.infomap:
         jsi.info_map();
-
-    elif args.set_torrent_ratio:
-        # jsi.py --set-torrent-ratio ID RATIO
-        jsi.set_torrent_ratio(args.set_torrent_ratio[0], args.set_torrent_ratio[1]);
-        if not jsi.error:
-            sys.stderr.write("Ratio of selected torrent was successfully changed.")
 
     elif args.pieces:
         print jsi.pieces(args.pieces);
