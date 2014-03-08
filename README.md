@@ -22,7 +22,7 @@ Coming soon
 
 ### Setting up PATH
 
-To use jsi.py on the command line, without having to type the full path to jsi.py, it's installed path must in your system path environment variable.
+To use jsi.py on the command line, without having to type the full path to jsi.py, the installed path must be in your system path environment variable.
 
 ## Set up API key
 
