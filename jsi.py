@@ -521,10 +521,12 @@ class JustSeedIt():
                 ratio = 0.0
             else:
                 ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
-            print "{:>30} {:>8} {:>12} {:>.2f} {}".format(torrent['size_as_string'],
+            
+            print "{:>30} {:>8} {:>12} {:>.2f} {:>.2f} {}".format(torrent['size_as_string'],
                                                       torrent['percentage_as_decimal'] + "%",
                                                       torrent['elapsed_as_string'],
                                                       ratio,
+                                                      float(torrent['maximum_ratio_as_decimal']),
                                                       torrent['status'],)                         
         
         result = xmltodict.parse(xml_response)
