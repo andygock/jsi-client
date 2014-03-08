@@ -1,4 +1,4 @@
-#!python
+#!/usr/bin/env python
 """
 
 /torrents/list.csp?api_key=[40 character api key]
@@ -23,27 +23,9 @@ import sys, os
 import urllib, urllib2, xmltodict, json, argparse, poster, collections
 import re, zlib, StringIO, gzip, bencode
 from pprint import pprint
+from colorama import init, Fore, Back, Style
 
 JSI_VERSION = "0.0"
-#from __future__ import print_function
-#def warning(*objs):
-#    print("WARNING: ", *objs, file=sys.stderr)
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-
-    def disable(self):
-        self.HEADER = ''
-        self.OKBLUE = ''
-        self.OKGREEN = ''
-        self.WARNING = ''
-        self.FAIL = ''
-        self.ENDC = ''
 
 def is_number(s):
     try:
@@ -614,18 +596,30 @@ class JustSeedIt():
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
             name = self.urldecode_to_ascii(torrent['name'])
-            print "[{:>3}] {}".format(torrent['@id'], name)
+            
+            # Print torrent name
+            print Fore.CYAN + "[{:>3}] {}".format(torrent['@id'], name) + Fore.RESET
+            
             if float(torrent['downloaded_as_bytes']) == 0:
                 ratio = 0.0
             else:
                 ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
             
+            status = torrent['status']
+            if status == 'stopped':
+                # Show progress in RED if stopped
+                status = Fore.RED + status + Fore.RESET
+            else:
+                if torrent['percentage_as_decimal'] != "100.0":
+                    # Show status in GREEN, if progress is under 100%
+                    status = Fore.GREEN + status + Fore.RESET
+                
             print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent['size_as_string'],
                                                       torrent['percentage_as_decimal'] + "%",
                                                       torrent['elapsed_as_string'],
                                                       ratio,
                                                       float(torrent['maximum_ratio_as_decimal']),
-                                                      torrent['status'])                         
+                                                      status)                         
         
         result = xmltodict.parse(xml_response)
         print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
@@ -662,7 +656,17 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
     parser.add_argument("-z", "--compress",action='store_true', help='request api server to use gzip encoding')
-    
+
+    # set up coloring with colorama
+    terminal = os.getenv('TERM')
+    if terminal == 'rxvt' or terminal == 'xterm':
+        # Cygwin, xterm emulators
+        init(autoreset=True, convert=False, strip=False)
+        
+    else:
+        # Standard windows console
+        init(autoreset=True)
+
     args = parser.parse_args()
     #print args; sys.exit()
     
