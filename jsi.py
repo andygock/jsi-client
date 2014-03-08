@@ -127,9 +127,9 @@ class JustSeedIt():
         return
 
     @staticmethod
-    def xml_from_file(file):
+    def xml_from_file(filename):
         """ Experimental use only """
-        f = open(file, 'r')
+        f = open(filename, 'r')
         xml = f.read()
         return xml
   
@@ -178,8 +178,8 @@ class JustSeedIt():
             
             if response.info().get('Content-Encoding') == 'gzip':
                 # Server sent gzip encoded stream, uncompress it
-                buffer = StringIO.StringIO(response.read())
-                f = gzip.GzipFile(fileobj=buffer)
+                gzbuffer = StringIO.StringIO(response.read())
+                f = gzip.GzipFile(fileobj=gzbuffer)
                 xml_response = f.read()
             else:
                 # Normal uncompressed stream
@@ -219,26 +219,26 @@ class JustSeedIt():
             sys.stderr.write('Warning: '+error+"\n")
             return False
     
-    def id_to_infohash(self, id):
+    def id_to_infohash(self, torrent_id):
         """ Find the info hash, when given a ID, returns infohash """
         #print self.torrents
-        if id in self.torrents:
-            if 'info_hash' in self.torrents[id]:
-                return self.torrents[id]['info_hash']
+        if torrent_id in self.torrents:
+            if 'info_hash' in self.torrents[torrent_id]:
+                return self.torrents[torrent_id]['info_hash']
             else:
-                sys.stderr.write("Error: No info hash available for ID {}\n".format(id))
+                sys.stderr.write("Error: No info hash available for ID {}\n".format(torrent_id))
                 return False
 
         else:
             self.list_update()  # Read info from API server
-            if id in self.torrents:
-                if 'info_hash' in self.torrents[id]:
-                    return self.torrents[id]['info_hash']
+            if torrent_id in self.torrents:
+                if 'info_hash' in self.torrents[torrent_id]:
+                    return self.torrents[torrent_id]['info_hash']
                 else:
-                    sys.stderr.write("Error: No info hash available for ID {}\n".format(id))
+                    sys.stderr.write("Error: No info hash available for ID {}\n".format(torrent_id))
                     return False
             else:
-                sys.stderr.write("Error: No such ID number of '{}'\n".format(id))
+                sys.stderr.write("Error: No such ID number of '{}'\n".format(torrent_id))
                 return False
     
     def info(self, infohash):
@@ -335,17 +335,17 @@ class JustSeedIt():
             infohashes = [infohashes]
 
         for infohash in infohashes:
-            id = False
+            torrent_id = False
             if len(infohash) != 40:
-                id = infohash
+                torrent_id = infohash
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
     
             if 'ratio' in parameters:
                 # ratio already set in self.ratio, given my --ratio arg
-                if id:
-                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(id, self.ratio))
+                if torrent_id:
+                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(torrent_id, self.ratio))
                 else:
                     sys.stderr.write("Changing ratio of torrent {} to {}\n".format(infohash, self.ratio))
                     
@@ -384,14 +384,14 @@ class JustSeedIt():
         self.list_update()
 
         for infohash in infohashes:
-            id = infohash
+            torrent_id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
 
             if self.verbose or self.debug:
-                sys.stderr.write("Starting torrent: {}\n".format(id))
+                sys.stderr.write("Starting torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/start.csp", {'info_hash': infohash})
 
@@ -408,14 +408,14 @@ class JustSeedIt():
         self.list_update()
 
         for infohash in infohashes:
-            id = infohash
+            torrent_id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
             
             if self.verbose or self.debug:
-                sys.stderr.write("Stopping torrent: {}\n".format(id))
+                sys.stderr.write("Stopping torrent: {}\n".format(torrent_id))
             
             response_xml = self.api("/torrent/stop.csp", {'info_hash': infohash})
 
@@ -456,12 +456,12 @@ class JustSeedIt():
         # grab list info, so we can get the torrent name
         self.list_update()
 
-        urls = []
+        url_list = []
         
         for infohash in infohashes:
             # if ID number is given as arg instead of infohash then
             # find out the info hash
-            id = infohash
+            torrent_id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
@@ -473,24 +473,24 @@ class JustSeedIt():
             
             if 'url' in result['result']['data']['row']:
                 # Single file
-                urls.append(urllib.unquote(result['result']['data']['row']['url']))
+                url_list.append(urllib.unquote(result['result']['data']['row']['url']))
             else:
                 if len(result['result']['data']['row']):
                     # Multiple files
                     for row in result['result']['data']['row']:
                         if 'url' in row:
                             if row['url']:  # It could be None if not available, either that or the field is just missing
-                                urls.append(urllib.unquote(row['url']))
+                                url_list.append(urllib.unquote(row['url']))
                 else:
                     # No files for this torrent (possible?)
-                    sys.stderr.write("The torrent '{}' has no files!\n".format(id))
+                    sys.stderr.write("The torrent '{}' has no files!\n".format(torrent_id))
                     continue
                     
-            if len(urls) == 0:
-                sys.stderr.write("There are no download links available for the torrent '{}'\n".format(id))
+            if len(url_list) == 0:
+                sys.stderr.write("There are no download links available for the torrent '{}'\n".format(torrent_id))
                 continue
             
-        return urls
+        return url_list
 
     def aria2_script(self, infohashes, options=None):
         """ Generate a aria2 download script for selected infohash or id number
@@ -521,8 +521,8 @@ class JustSeedIt():
     def info_map(self):
         self.list_update()
         print " ID INFOHASH"
-        for id, torrent in self.torrents.items():
-            print "{:>3} {}".format(id, torrent['info_hash'])
+        for torrent_id, torrent in self.torrents.items():
+            print "{:>3} {}".format(torrent_id, torrent['info_hash'])
            
     def add_magnet(self, magnets):
         """ Add magnet links defined in list 'magnets'.
@@ -617,7 +617,7 @@ class JustSeedIt():
             print xml_response
             sys.exit()
         
-        for id, torrent in self.torrents.items():
+        for torrent_id, torrent in self.torrents.items():
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
             name = self.urldecode_to_ascii(torrent['name'])
