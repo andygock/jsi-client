@@ -4,9 +4,11 @@ Command line client for [justseed.it](https://justseed.it) seedbox service.
 
 ## Installation
 
+Thsi is designed and tested on [Python 2.7](http://www.python.org/download/), you'll need it to run this script (exception being if you are downloading a Windows pre-compiled binary of this program).
+
 ### Using source
 
-To run, it requires the the following packages which are in addition to those standard packages which come with Python.:
+To run, it requires the the following packages which are in addition to those standard packages which come with Python:
 
 - [xmltodict](http://pypi.python.org/pypi/xmltodict/)
 - [poster](http://pypi.python.org/pypi/poster/)
@@ -30,6 +32,10 @@ To use jsi.py on the command line, without having to type the full path to jsi.p
 You'll need an API key for use with your justseed.it account. Create a file called `.justseedit_apikey` in your home directory. If this file is not found in your home directory, then it will look for it in the same directory as the running jsi.py. If it is not found in either, it will display an error and quit.
 
 All the above can be overwritten, and a api key can be specified on the command line using the `--api-key` option. It is not recommended to use this method.
+
+If you're not sure where your home directory on your computer, run the following to find out:
+
+	python -c "import os; print os.path.expanduser('~')"
 
 ## Show usage options
 
