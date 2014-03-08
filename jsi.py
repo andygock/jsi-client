@@ -423,69 +423,73 @@ class JustSeedIt():
         response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
         return response_xml
     
-    def download_links(self, infohash):
+    def download_links(self, infohashes):
         """ Get download links fsor infohash or ID number.
             Return list of direct download urls.
         """
         # grab list info, so we can get the torrent name
         self.list_update()
 
-        # if ID number is given as arg instead of infohash then
-        # find out the info hash
-        if len(infohash) != 40:
-            infohash = self.id_to_infohash(infohash)
-            if not infohash:
-                return
-                    
-        response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
-        #response_xml = self.xml_from_file('files.xml') # debug
-        result = xmltodict.parse(response_xml)
         urls = []
-        if 'url' in result['result']['data']['row']:
-            # Single file
-            urls.append( urllib.unquote(result['result']['data']['row']['url']) )
-        else:
-            if len(result['result']['data']['row']):
-                # Multiple files
-                for row in result['result']['data']['row']:
-                    if 'url' in row:
-                        if row['url']: # It could be None if not available, either that or the field is just missing
-                            urls.append( urllib.unquote(row['url']) )
+        
+        for infohash in infohashes:
+            # if ID number is given as arg instead of infohash then
+            # find out the info hash
+            id = infohash
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+                        
+            response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
+            #response_xml = self.xml_from_file('files.xml') # debug
+            result = xmltodict.parse(response_xml)
+            
+            if 'url' in result['result']['data']['row']:
+                # Single file
+                urls.append( urllib.unquote(result['result']['data']['row']['url']) )
             else:
-                # No files for this torrent (possible?)
-                sys.stderr.write("This torrent has no files!")
-                sys.exit()
-                
-        if len(urls) == 0:
-            sys.stderr.write("There are no download links available for this torrent!")
-            sys.exit()
+                if len(result['result']['data']['row']):
+                    # Multiple files
+                    for row in result['result']['data']['row']:
+                        if 'url' in row:
+                            if row['url']: # It could be None if not available, either that or the field is just missing
+                                urls.append( urllib.unquote(row['url']) )
+                else:
+                    # No files for this torrent (possible?)
+                    sys.stderr.write("The torrent '{}' has no files!\n".format(id))
+                    continue
+                    
+            if len(urls) == 0:
+                sys.stderr.write("There are no download links available for the torrent '{}'\n".format(id))
+                continue
             
         return urls
 
-    def aria2_script(self, infohash, options=None):
+    def aria2_script(self, infohashes, options=None):
         """ Generate a aria2 download script for selected infohash or id number
         """
 
-        # get download links
-        urls = self.download_links(infohash)
-
-        if not options:
-            options = self.aria2_options
-
-        for url in urls:
-            
-            #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
-            file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/','',url))
-            
-            output_dir = self.output_dir
-            
-            if infohash in self.torrents:
-                if 'name' in self.torrents[infohash]:
-                   output_dir += self.torrents[infohash]['name']
-                    
-            output_dir = self.urldecode_to_ascii(output_dir)
-            
-            print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
+        for infohash in infohashes:
+            # get download links
+            urls = self.download_links([infohash])
+    
+            if not options:
+                options = self.aria2_options
+    
+            for url in urls:
+                #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
+                file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/','',url))
+                
+                output_dir = self.output_dir
+                
+                if infohash in self.torrents:
+                    if 'name' in self.torrents[infohash]:
+                       output_dir += self.torrents[infohash]['name']
+                        
+                output_dir = self.urldecode_to_ascii(output_dir)
+                
+                print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
         return
                 
     def info_map(self):
@@ -541,9 +545,13 @@ class JustSeedIt():
     def list_update(self):
         """ Read list information and save in self.torrents
         """
-        xml_response = self.api("/torrents/list.csp")
-        if xml_response:
+        
+        if len(self.torrents) == 0: 
+            xml_response = self.api("/torrents/list.csp")
             
+            if not xml_response:
+                return
+        
             # Make new maps
             self.id_to_infohash_map = collections.OrderedDict()
             self.torrents = collections.OrderedDict()
@@ -566,8 +574,12 @@ class JustSeedIt():
                 else:
                     # No entries, leave var maps as empty 
                     pass
+        else:
+            # list already up to date
+            # don't need to do anything
+            pass
         
-        return xml_response
+        return self.xml_response
                    
     def list(self):
         """ Show torrents in pretty format
@@ -601,14 +613,14 @@ class JustSeedIt():
 if __name__ == "__main__":
     # Set up CLI arguments
     parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client', epilog='')
-    parser.add_argument("--aria2", type=str, metavar='INFO-HASH', help='generate aria2 script for downloading')
+    parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--compress", '-z', action='store_true', help='request api server to use gzip encoding')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
     parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
-    parser.add_argument("--download-links", type=str, metavar='INFO-HASH', help='get download links')
+    parser.add_argument("--download-links", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
@@ -697,6 +709,7 @@ if __name__ == "__main__":
 
     elif args.trackers:
         print jsi.trackers(args.trackers);
+        
     elif args.peers:
         print jsi.peers(args.peers);
          
