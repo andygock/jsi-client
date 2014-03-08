@@ -24,6 +24,7 @@ import urllib, urllib2, xmltodict, json, argparse, poster, collections
 import re, zlib, StringIO, gzip, bencode
 from pprint import pprint
 
+JSI_VERSION = "0.0"
 #from __future__ import print_function
 #def warning(*objs):
 #    print("WARNING: ", *objs, file=sys.stderr)
@@ -64,12 +65,12 @@ def hexdump(src, length=16):
 class JustSeedIt():
     
     # Default options
-    api_key = ""; # Do not use this, use '.justseedit_api_key' file
-    url = "https://api.justseed.it"
-    aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
+    
+    DEFAULT_API_SERVER = "https://api.justseed.it"
+    DEFAULT_ARIA2_OPTIONS = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
         "--continue --max-connection-per-server=8 --min-split-size=1M"
-    output_dir = 'd:/Downloads/justseed.it Downloads/'
-    ratio = 1.0
+    DEFAULT_DOWNLOAD_DIR = 'd:/Downloads/justseed.it Downloads/'
+    DEFAULT_RATIO = 1.0
     
     def __init__(self, api_key=''):
         self.api_key = "" # start off blank
@@ -106,6 +107,10 @@ class JustSeedIt():
                 sys.exit()
         
         # Set default configs, these may be changed later
+        self.url = self.DEFAULT_API_SERVER
+        self.aria2_options = self.DEFAULT_ARIA2_OPTIONS
+        self.output_dir = self.DEFAULT_DOWNLOAD_DIR
+        self.ratio = self.DEFAULT_DOWNLOAD_DIR
         
         self.error = False
         self.debug = 0
@@ -115,6 +120,9 @@ class JustSeedIt():
         self.compress = False
         self.edit_opts = []
         self.verbose = False
+
+    def pretty_print(self, data):
+        print( json.dumps(data, indent=4) );
     
     def quit(self, message):
         print "Error:", message
@@ -625,28 +633,30 @@ class JustSeedIt():
     
 if __name__ == "__main__":
     # Set up CLI arguments
-    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client', epilog='')
+    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version '+ JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown the first column of the --list output.')
+    
     parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
-    parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
+    parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
-    parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
+    #parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
-    parser.add_argument("-i", "--info", type=str, metavar='INFOHASH', help='show info for torrent (by infohash or ID)')
+    parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
     parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("--name", type=float, help='set name (used with -e)')
+    parser.add_argument("-o", "--output-dir", type=str, help='set output dir for aria2 scripts (default: "{}")'.format(JustSeedIt.DEFAULT_DOWNLOAD_DIR))
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
     parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
-    parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t, -m or -e)')
+    parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio, used in conjunction with -t, -m or -e (default: {})'.format(str(JustSeedIt.DEFAULT_RATIO)))
     parser.add_argument("--start", type=str, nargs='*', metavar='INFO-HASH', help='start torrent')
     parser.add_argument("--stop", type=str, nargs='*', metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
@@ -664,6 +674,9 @@ if __name__ == "__main__":
     if args.debug:
         jsi.debug = 1
         
+    if args.verbose:
+        jsi.verbose = True
+                
     if args.xml:
         jsi.xml_mode = True      
 
@@ -673,8 +686,11 @@ if __name__ == "__main__":
     if args.dry:
         jsi.dry_run = 1
          
-    if args.verbose:
-        jsi.verbose = True
+    if args.aria2_options:
+        jsi.aria2_options = output_dir
+
+    if args.output_dir:
+        jsi.output_dir = output_dir
         
     if args.ratio:
         jsi.ratio = args.ratio
@@ -682,6 +698,7 @@ if __name__ == "__main__":
 
     if args.name:
         sys.stderr.write("--name is not implemented")
+        sys.exit()
         
     # Perform main actions
     
@@ -712,21 +729,21 @@ if __name__ == "__main__":
     elif args.stop:
         jsi.stop(args.stop);       
 
-    elif args.delete:
-        print "Not implemented"
+    #elif args.delete:
+        #print "Not implemented"
         #print jsi.delete(args.delete);      
  
     elif args.bitfield:
-        print jsi.bitfield(args.bitfield);
+        jsi.pretty_print(jsi.bitfield(args.bitfield));
 
     elif args.trackers:
-        print jsi.trackers(args.trackers);
+        jsi.pretty_print(jsi.trackers(args.trackers));
         
     elif args.peers:
-        print jsi.peers(args.peers);
+        jsi.pretty_print(jsi.peers(args.peers));
          
     elif args.files:
-        print jsi.files(args.files);
+        jsi.pretty_print(jsi.files(args.files));
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links);
