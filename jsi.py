@@ -600,7 +600,7 @@ class JustSeedIt():
             else:
                 ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
             
-            print "{:>30} {:>8} {:>12} {:>.2f} {:>.2f} {}".format(torrent['size_as_string'],
+            print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent['size_as_string'],
                                                       torrent['percentage_as_decimal'] + "%",
                                                       torrent['elapsed_as_string'],
                                                       ratio,
