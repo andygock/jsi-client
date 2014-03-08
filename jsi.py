@@ -75,8 +75,11 @@ class JustSeedIt():
 
         if self.api_key != "":
             self.api_key = api_key
-            #sys.stderr.write("Read API key from constructor")
-            
+            if self.api_key == "":
+                # No found in file searches above
+                sys.stderr.write("Error: Specified API key with --api-key was blank")
+                sys.exit()
+              
         else:
             # Get homedir
             self.homedir = os.path.expanduser("~")
@@ -88,17 +91,17 @@ class JustSeedIt():
                     f = open(keyfile,'r') 
                     key = f.read()
                     self.api_key = key.strip()
-                    #sys.stderr.write("Read API key from '{}'".format(keyfile))
+                    #sys.stderr.write("Read API key from '{}'\n".format(keyfile))
                     break
                 except IOError:
                     # Could not read api key from file
                     # Use default api_key, which is actually an empty string
                     continue
         
-        if self.api_key == "":
-            # No found in file searches above
-            sys.stderr.write("No API key file could be found or was specified")
-            sys.exit()
+            if self.api_key == "":
+                # No found in file searches above
+                sys.stderr.write("Error: No API key file could be found or was specified")
+                sys.exit()
         
         # Set default configs, these may be changed later
         self.ratio = 1.0
