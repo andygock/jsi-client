@@ -114,6 +114,7 @@ class JustSeedIt():
         self.torrents = {}
         self.compress = False
         self.edit_opts = []
+        self.verbose = False
     
     def quit(self, message):
         print "Error:", message
@@ -161,7 +162,7 @@ class JustSeedIt():
                 print hexdump("".join(post_data))
                 return "<data>Dry run mode: This is not actual API server response.</data>"
             
-            if self.debug:
+            if self.verbose or self.debug:
                 sys.stderr.write('Requesting from '+self.url + page + " ... ")
 
             # Form and make the actual request
@@ -182,7 +183,7 @@ class JustSeedIt():
                 # Normal uncompressed stream
                 xml_response = response.read() # Read server response
 
-            if self.debug:
+            if self.verbose or self.debug:
                 # Tell user the response was read
                 sys.stderr.write("OK\n")
 
@@ -222,7 +223,7 @@ class JustSeedIt():
             if 'info_hash' in self.torrents[id]:
                 return self.torrents[id]['info_hash']
             else:
-                sys.stderr.write("No info hash available for ID {}\n".format(id))
+                sys.stderr.write("Error: No info hash available for ID {}\n".format(id))
                 return False
 
         else:
@@ -231,10 +232,10 @@ class JustSeedIt():
                 if 'info_hash' in self.torrents[id]:
                     return self.torrents[id]['info_hash']
                 else:
-                    sys.stderr.write("No info hash available for ID {}\n".format(id))
+                    sys.stderr.write("Error: No info hash available for ID {}\n".format(id))
                     return False
             else:
-                sys.stderr.write("No such ID number of '{}'\n".format(id))
+                sys.stderr.write("Error: No such ID number of '{}'\n".format(id))
                 return False
     
     def info(self, infohash):
@@ -306,6 +307,8 @@ class JustSeedIt():
     def trackers(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
+            if not infohash:
+                return
             
         response_xml = self.api("/torrent/trackers.csp",{'info_hash': infohash })
 
@@ -324,6 +327,9 @@ class JustSeedIt():
         
         self.list_update()
         
+        if not isinstance(infohashes, list):
+            infohashes = [infohashes]
+
         for infohash in infohashes:
             id = False
             if len(infohash) != 40:
@@ -344,8 +350,7 @@ class JustSeedIt():
                     print response_xml            
             
             if 'name' in parameters:
-                sys.stderr.write("Not implemented.\n");
-           
+                sys.stderr.write("Not implemented.\n");           
         
         if self.xml_mode:
             sys.exit()
@@ -367,38 +372,45 @@ class JustSeedIt():
         result = xmltodict.parse(response_xml)
         return result
     
-    def start(self, infohash):
+    def start(self, infohashes):
         """ Start torrent(s)
-            to-do: allow multiple id numbers together, or a range of numbers
         """
-        if len(infohash) != 40:
-            infohash = self.id_to_infohash(infohash)
-            if not infohash:
-                return
-                    
-        response_xml = self.api("/torrent/start.csp",{'info_hash': infohash })
 
-        if self.xml_mode:
-            print response_xml
-            sys.exit()
+        self.list_update()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        for infohash in infohashes:
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+                        
+            response_xml = self.api("/torrent/start.csp",{'info_hash': infohash })
 
-    def stop(self, infohash):
-        if len(infohash) != 40:
-            infohash = self.id_to_infohash(infohash)
-            if not infohash:
-                return
-                    
-        response_xml = self.api("/torrent/stop.csp",{'info_hash': infohash })
+            if self.xml_mode:
+                print response_xml
+                continue
 
-        if self.xml_mode:
-            print response_xml
-            sys.exit()
+        return
 
-        result = xmltodict.parse(response_xml)
-        return result
+    def stop(self, infohashes):
+        """ Stop torrent(s)
+        """
+
+        self.list_update()
+
+        for infohash in infohashes:
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+                        
+            response_xml = self.api("/torrent/stop.csp",{'info_hash': infohash })
+
+            if self.xml_mode:
+                print response_xml
+                continue
+
+        return
     
     def files(self, infohash):
         if len(infohash) != 40:
@@ -635,8 +647,8 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
     parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t, -m or -e)')
-    parser.add_argument("--start", type=str, metavar='INFO-HASH', help='start torrent')
-    parser.add_argument("--stop", type=str, metavar='INFO-HASH', help='stop torrent')
+    parser.add_argument("--start", type=str, nargs='*', metavar='INFO-HASH', help='start torrent')
+    parser.add_argument("--stop", type=str, nargs='*', metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
     parser.add_argument("-z", "--compress",action='store_true', help='request api server to use gzip encoding')
@@ -695,10 +707,10 @@ if __name__ == "__main__":
         print jsi.pieces(args.pieces);
 
     elif args.start:
-        print jsi.start(args.start);
-        
+        jsi.start(args.start);
+
     elif args.stop:
-        print jsi.stop(args.stop);       
+        jsi.stop(args.stop);       
 
     elif args.delete:
         print "Not implemented"
