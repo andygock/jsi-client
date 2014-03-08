@@ -21,7 +21,7 @@ or a .torrent file as a POST request where the file parameter is named "torrent_
 
 import sys, os
 import urllib, urllib2, xmltodict, json, argparse, poster, collections
-import re, zlib, StringIO, gzip
+import re, zlib, StringIO, gzip, bencode
 from pprint import pprint
 
 #from __future__ import print_function
@@ -449,31 +449,48 @@ class JustSeedIt():
         for id, torrent in self.torrents.items():
             print "{:>3} {}".format(id, torrent['info_hash'])
            
-    def add_magnet(self,magnet):
-        print "Adding magnet link with ratio {}".format(self.ratio)
-        response_xml = self.api("/torrent/add.csp",{'maximum_ratio':str(self.ratio), 'url': magnet })
-        if self.xml_mode:
-            print response_xml
-            sys.exit()
+    def add_magnet(self,magnets):
+        """ Add magnet links defined in list 'magnets'.
+            Doesn't return anything
+        """
+        for magnet in magnets:
+            sys.stder.write("Adding magnet link with ratio {}".format(self.ratio))
+            
+            # Check magnet data is valid
+            # @todo
+                        
+            response_xml = self.api("/torrent/add.csp",{'maximum_ratio':str(self.ratio), 'url': magnet })
+            if self.xml_mode:
+                print response_xml
         return
     
-    def add_torrent_file(self,filename):
-        """ Add .torrent file to system.
+    def add_torrent_file(self,filenames):
+        """ Add .torrent files to system. 'filenames' is a list of filenames.
             Doesn't return anything.
         """
-        print "Adding torrent file '{}' with ratio {}".format(filename, self.ratio)
         
-        try:
-            f = open(filename,'rb')
-            data = f.read()
-        except IOError:
-            sys.stderr.write("Could not open file '{0}'".format(filename))
-            return
-
-        self.api("/torrent/add.csp",{'torrent_file':data, 'maximum_ratio':str(self.ratio)})
-        if self.xml_mode:
-            print response_xml
-            sys.exit()        
+        for filename in filenames:
+        
+            sys.stderr.write("Adding torrent file '{}' with ratio {}\n".format(filename, self.ratio))
+            
+            try:
+                f = open(filename,'rb')
+                data = f.read()
+            except IOError:
+                sys.stderr.write("Could not open file '{0}'".format(filename))
+                continue
+    
+            # Check .torrent file data is valid
+            try:
+                bencode.bdecode(data)
+            except bencode.BTL.BTFailure:
+                sys.stderr.write("Error: Ignoring '{}', not a valid .torrent file!\n".format(filename))
+                continue
+            
+            self.api("/torrent/add.csp",{'torrent_file':data, 'maximum_ratio':str(self.ratio)})
+            if self.xml_mode:
+                print response_xml
+        
         return
 
     def list_update(self):
@@ -552,12 +569,12 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--info", type=str, metavar='INFOHASH', help='show info for torrent (by infohash or ID)')
     parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
-    parser.add_argument("-m", "--magnet", help="add torrent using magnet link", metavar='MAGNET-TEXT', type=str, nargs=1)
+    parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
     parser.add_argument("--set-torrent-ratio", type=str, metavar=('INFO-HASH','RATIO'), nargs=2, help='set maximum ratio for torrent')
-    parser.add_argument("-t", "--torrent-file", type=str, metavar='TORRENT-FILE', help='add torrent with .torrent file')
+    parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
     parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio (used in conjunction with -t or -m)')
     parser.add_argument("--start", type=str, metavar='INFO-HASH', help='start torrent')
@@ -566,6 +583,8 @@ if __name__ == "__main__":
     parser.add_argument("--xml", action='store_true', help='display result as XML')
     
     args = parser.parse_args()
+    
+    #print args; sys.exit()
     
     if args.api_key:
         jsi = JustSeedIt(args.api_key);
