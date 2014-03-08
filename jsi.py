@@ -1,31 +1,32 @@
 #!/usr/bin/env python
 """
 
-/torrents/list.csp?api_key=[40 character api key]
-/torrent/information.csp?api_key=[40 character api key]&info_hash=[40 character torrent info hash]
-/torrent/files.csp?api_key=[40 character api key]&info_hash=[40 character torrent info hash] 
-/torrent/trackers.csp?api_key=[40 character api key]&info_hash=[40 character torrent info hash] 
-/torrent/peers.csp?api_key=[40 character api key]&info_hash=[40 character torrent info hash] 
+jsi.py
 
-/torrent/add.csp?api_key=[40 character api key]
-&url=[url or magnet link]
-&info_hash=[40 character torrent info hash]
+Unofficial justseed.it cli client
 
-or a .torrent file as a POST request where the file parameter is named "torrent_file". i'm still running some tests on this, so it might not entirely behave itself, but hey pretty much everything's in alpha anyway...
-
-/torrent/delete.csp?api_key=[40 character api key]&info_hash=[40 character torrent info hash]
-/torrent/set_maximum_ratio.csp=[40 character api key]&info_hash=[40 character torrent info hash]&maximum_ratio=[optional decimal] (omitting will set to unlimited)
-/torrent/set_name.csp=[40 character api key]&info_hash=[40 character torrent info hash]&name=[optional string] (omitting name will reset to the default torrent name) 
 
 """
 
-import sys, os
-import urllib, urllib2, xmltodict, json, argparse, poster, collections
-import re, zlib, StringIO, gzip, bencode
+import sys
+import os
+import urllib
+import urllib2
+import xmltodict
+import json
+import argparse
+import poster
+import collections
+import re
+import zlib
+import StringIO
+import gzip
+import bencode
 from pprint import pprint
 from colorama import init, Fore, Back, Style
 
 JSI_VERSION = "0.0"
+
 
 def is_number(s):
     try:
@@ -34,6 +35,7 @@ def is_number(s):
     except ValueError:
         return False
     
+
 def hexdump(src, length=16):
     FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
     lines = []
@@ -44,18 +46,19 @@ def hexdump(src, length=16):
         lines.append("%04x  %-*s  %s\n" % (c, length*3, hex, printable))
     return ''.join(lines)
         
+
 class JustSeedIt():
     
     # Default options
     
     DEFAULT_API_SERVER = "https://api.justseed.it"
-    DEFAULT_ARIA2_OPTIONS = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
+    DEFAULT_ARIA2_OPTIONS = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 " + \
         "--continue --max-connection-per-server=8 --min-split-size=1M"
     DEFAULT_DOWNLOAD_DIR = 'd:/Downloads/justseed.it Downloads/'
     DEFAULT_RATIO = 1.0
     
     def __init__(self, api_key=''):
-        self.api_key = "" # start off blank
+        self.api_key = ""  # start off blank
 
         if self.api_key != "":
             self.api_key = api_key
@@ -69,11 +72,11 @@ class JustSeedIt():
             self.homedir = os.path.expanduser("~")
             
             # Obtain API key
-            for keyfile in [self.homedir + '/.justseedit_apikey',\
+            for keyfile in [self.homedir + '/.justseedit_apikey',
                             os.path.dirname(os.path.realpath(__file__)) + '/.justseedit_apikey']:
                 # Try different locations for key file
                 try:
-                    f = open(keyfile,'r') 
+                    f = open(keyfile, 'r')
                     key = f.read()
                     self.api_key = key.strip()
                     #sys.stderr.write("Read API key from '{}'\n".format(keyfile))
@@ -103,10 +106,18 @@ class JustSeedIt():
         self.edit_opts = []
         self.verbose = False
 
-    def pretty_print(self, data):
-        print( json.dumps(data, indent=4) );
-    
-    def quit(self, message):
+        self.xml_response = ''
+
+        self.id_to_infohash_map = collections.OrderedDict()
+        self.torrents = collections.OrderedDict()
+        self.info_map = collections.OrderedDict()
+
+    @staticmethod
+    def pretty_print(data):
+        print(json.dumps(data, indent=4))
+
+    @staticmethod
+    def quit(message):
         print "Error:", message
         print "Quitting."
         sys.exit()
@@ -114,10 +125,11 @@ class JustSeedIt():
     def edit_append(self, option):
         self.edit_opts.append(option)
         return
-    
-    def xml_from_file(self, file):
+
+    @staticmethod
+    def xml_from_file(file):
         """ Experimental use only """
-        f = open(file,'r') 
+        f = open(file, 'r')
         xml = f.read()
         return xml
   
@@ -129,7 +141,7 @@ class JustSeedIt():
         
         if False:
             print "[DEBUG] Calling {:} with:".format(page)
-            for key,value in data.items():
+            for key, value in data.items():
                 #print key, value
                 print "{:>15}: {:}".format(key, value)
         
@@ -145,8 +157,8 @@ class JustSeedIt():
             if self.dry_run:
                 print "\nHeaders:\n"
                 #print headers
-                for k,v in headers.items():
-                    print "{}: {}".format(k,v)
+                for k, v in headers.items():
+                    print "{}: {}".format(k, v)
                 
                 print "\nBody:\n"
                 print hexdump("".join(post_data))
@@ -171,7 +183,7 @@ class JustSeedIt():
                 xml_response = f.read()
             else:
                 # Normal uncompressed stream
-                xml_response = response.read() # Read server response
+                xml_response = response.read()  # Read server response
 
             if self.verbose or self.debug:
                 # Tell user the response was read
@@ -193,9 +205,10 @@ class JustSeedIt():
             # self.check_server_response() will already display an error message
             self.error = True
             return False
-    
-    def check_server_response(self,xml_data):
-        """ Check server reponse is valid and return True or False. Error is printed to
+
+    @staticmethod
+    def check_server_response(xml_data):
+        """ Check server response is valid and return True or False. Error is printed to
             stderr if response is not "SUCCESS".
         """
         result = xmltodict.parse(xml_data)
@@ -217,7 +230,7 @@ class JustSeedIt():
                 return False
 
         else:
-            self.list_update() # Read info from API server
+            self.list_update()  # Read info from API server
             if id in self.torrents:
                 if 'info_hash' in self.torrents[id]:
                     return self.torrents[id]['info_hash']
@@ -236,33 +249,34 @@ class JustSeedIt():
             if not infohash:
                 return
             
-        response_xml = self.api("/torrent/information.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/information.csp", {'info_hash': infohash})
         if self.xml_mode:
             print response_xml
             sys.exit()
 
         result = xmltodict.parse(response_xml)
-        for k,v in result['result']['data'].items():
+        for k, v in result['result']['data'].items():
             if k == '@name':
                 continue
             if v:
                 if k == 'name':
                     # Replace unicode chars with '-' for torrent name only
-                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v,'replace'))
+                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v, 'replace'))
                 else:
-                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v,'strict'))
+                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v, 'strict'))
             else:
                 # No value available for this key
                 print "{:>24}:".format(k)
             
         return result
 
-    def urldecode_to_ascii(self,s,error_opt='replace'):
-        output = urllib.unquote( s.encode('ascii') ).decode('utf-8').encode('ascii',error_opt)
+    @staticmethod
+    def urldecode_to_ascii(s, error_opt='replace'):
+        output = urllib.unquote(s.encode('ascii')).decode('utf-8').encode('ascii', error_opt)
         
         # Replace '?' with '-'
         if error_opt == 'replace':
-            output = re.sub('\?','-',output)
+            output = re.sub('\?', '-', output)
         return output
         
     def pieces(self, infohash):
@@ -270,7 +284,7 @@ class JustSeedIt():
             infohash = self.id_to_infohash(infohash)
             if not infohash:
                 return            
-        response_xml = self.api("/torrent/pieces.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/pieces.csp", {'info_hash': infohash})
         
         if self.xml_mode:
             print response_xml
@@ -285,7 +299,7 @@ class JustSeedIt():
             if not infohash:
                 return
                         
-        response_xml = self.api("/torrent/bitfield.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/bitfield.csp", {'info_hash': infohash})
 
         if self.xml_mode:
             print response_xml
@@ -300,7 +314,7 @@ class JustSeedIt():
             if not infohash:
                 return
             
-        response_xml = self.api("/torrent/trackers.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/trackers.csp", {'info_hash': infohash})
 
         if self.xml_mode:
             print response_xml
@@ -331,16 +345,17 @@ class JustSeedIt():
             if 'ratio' in parameters:
                 # ratio already set in self.ratio, given my --ratio arg
                 if id:
-                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(id,self.ratio))
+                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(id, self.ratio))
                 else:
-                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(infohash,self.ratio))
+                    sys.stderr.write("Changing ratio of torrent {} to {}\n".format(infohash, self.ratio))
                     
-                response_xml = self.api("/torrent/set_maximum_ratio.csp",{'info_hash': infohash, 'maximum_ratio': self.ratio })
+                response_xml = self.api("/torrent/set_maximum_ratio.csp",
+                                        {'info_hash': infohash, 'maximum_ratio': self.ratio})
                 if self.xml_mode:
                     print response_xml            
             
             if 'name' in parameters:
-                sys.stderr.write("Not implemented.\n");           
+                sys.stderr.write("Not implemented.\n")
         
         if self.xml_mode:
             sys.exit()
@@ -353,7 +368,7 @@ class JustSeedIt():
             if not infohash:
                 return
                        
-        response_xml = self.api("/torrent/peers.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/peers.csp", {'info_hash': infohash})
 
         if self.xml_mode:
             print response_xml
@@ -369,12 +384,16 @@ class JustSeedIt():
         self.list_update()
 
         for infohash in infohashes:
+            id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
-                        
-            response_xml = self.api("/torrent/start.csp",{'info_hash': infohash })
+
+            if self.verbose or self.debug:
+                sys.stderr.write("Starting torrent: {}\n".format(id))
+
+            response_xml = self.api("/torrent/start.csp", {'info_hash': infohash})
 
             if self.xml_mode:
                 print response_xml
@@ -389,12 +408,16 @@ class JustSeedIt():
         self.list_update()
 
         for infohash in infohashes:
+            id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
-                        
-            response_xml = self.api("/torrent/stop.csp",{'info_hash': infohash })
+            
+            if self.verbose or self.debug:
+                sys.stderr.write("Stopping torrent: {}\n".format(id))
+            
+            response_xml = self.api("/torrent/stop.csp", {'info_hash': infohash})
 
             if self.xml_mode:
                 print response_xml
@@ -407,8 +430,8 @@ class JustSeedIt():
             infohash = self.id_to_infohash(infohash)
             if not infohash:
                 return
-                        
-        response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
+
+        response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
 
         if self.xml_mode:
             print response_xml
@@ -423,7 +446,7 @@ class JustSeedIt():
             if not infohash:
                 return
                         
-        response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
+        response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
         return response_xml
     
     def download_links(self, infohashes):
@@ -444,20 +467,20 @@ class JustSeedIt():
                 if not infohash:
                     continue
                         
-            response_xml = self.api("/torrent/files.csp",{'info_hash': infohash })
+            response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
             #response_xml = self.xml_from_file('files.xml') # debug
             result = xmltodict.parse(response_xml)
             
             if 'url' in result['result']['data']['row']:
                 # Single file
-                urls.append( urllib.unquote(result['result']['data']['row']['url']) )
+                urls.append(urllib.unquote(result['result']['data']['row']['url']))
             else:
                 if len(result['result']['data']['row']):
                     # Multiple files
                     for row in result['result']['data']['row']:
                         if 'url' in row:
-                            if row['url']: # It could be None if not available, either that or the field is just missing
-                                urls.append( urllib.unquote(row['url']) )
+                            if row['url']:  # It could be None if not available, either that or the field is just missing
+                                urls.append(urllib.unquote(row['url']))
                 else:
                     # No files for this torrent (possible?)
                     sys.stderr.write("The torrent '{}' has no files!\n".format(id))
@@ -482,13 +505,13 @@ class JustSeedIt():
     
             for url in urls:
                 #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
-                file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/','',url))
+                file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
                 
                 output_dir = self.output_dir
                 
                 if infohash in self.torrents:
                     if 'name' in self.torrents[infohash]:
-                       output_dir += self.torrents[infohash]['name']
+                        output_dir += self.torrents[infohash]['name']
                         
                 output_dir = self.urldecode_to_ascii(output_dir)
                 
@@ -501,22 +524,22 @@ class JustSeedIt():
         for id, torrent in self.torrents.items():
             print "{:>3} {}".format(id, torrent['info_hash'])
            
-    def add_magnet(self,magnets):
+    def add_magnet(self, magnets):
         """ Add magnet links defined in list 'magnets'.
             Doesn't return anything
         """
         for magnet in magnets:
-            sys.stder.write("Adding magnet link with ratio {}\n".format(self.ratio))
+            sys.stderr.write("Adding magnet link with ratio {}\n".format(self.ratio))
             
             # Check magnet data is valid
             # @todo
                         
-            response_xml = self.api("/torrent/add.csp",{'maximum_ratio':str(self.ratio), 'url': magnet })
+            response_xml = self.api("/torrent/add.csp", {'maximum_ratio': str(self.ratio), 'url': magnet})
             if self.xml_mode:
                 print response_xml
         return
     
-    def add_torrent_file(self,filenames):
+    def add_torrent_file(self, filenames):
         """ Add .torrent files to system. 'filenames' is a list of filenames.
             Doesn't return anything.
         """
@@ -526,7 +549,7 @@ class JustSeedIt():
             sys.stderr.write("Adding torrent file '{}' with ratio {}\n".format(filename, self.ratio))
             
             try:
-                f = open(filename,'rb')
+                f = open(filename, 'rb')
                 data = f.read()
             except IOError:
                 sys.stderr.write("Could not open file '{0}'".format(filename))
@@ -539,9 +562,11 @@ class JustSeedIt():
                 sys.stderr.write("Error: Ignoring '{}', not a valid .torrent file!\n".format(filename))
                 continue
             
-            self.api("/torrent/add.csp",{'torrent_file':data, 'maximum_ratio':str(self.ratio)})
+            self.api("/torrent/add.csp", {'torrent_file': data, 'maximum_ratio': str(self.ratio)})
+
             if self.xml_mode:
-                print response_xml
+                print self.response_xml
+                continue
         
         return
 
@@ -566,8 +591,8 @@ class JustSeedIt():
             
             if 'info_hash' in torrents:
                 # Only 1 entry
-                self.id_to_infohash_map[torrent['@id']] = torrents['info_hash']
-                self.torrents[torrent['@id']] = torrents
+                self.id_to_infohash_map[torrents['@id']] = torrents['info_hash']
+                self.torrents[torrents['@id']] = torrents
             else:
                 # More than 1 entry
                 if len(torrents):
@@ -615,11 +640,11 @@ class JustSeedIt():
                     status = Fore.GREEN + status + Fore.RESET
                 
             print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent['size_as_string'],
-                                                      torrent['percentage_as_decimal'] + "%",
-                                                      torrent['elapsed_as_string'],
-                                                      ratio,
-                                                      float(torrent['maximum_ratio_as_decimal']),
-                                                      status)                         
+                                                                 torrent['percentage_as_decimal'] + "%",
+                                                                 torrent['elapsed_as_string'],
+                                                                 ratio,
+                                                                 float(torrent['maximum_ratio_as_decimal']),
+                                                                 status)
         
         result = xmltodict.parse(xml_response)
         print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
@@ -627,7 +652,7 @@ class JustSeedIt():
     
 if __name__ == "__main__":
     # Set up CLI arguments
-    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version '+ JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown in the first column of the --list output.')
+    parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version ' + JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown in the first column of the --list output.')
     
     parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
@@ -640,7 +665,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
     parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
-    parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
+    #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("--name", type=float, help='set name (used with -e)')
@@ -655,7 +680,7 @@ if __name__ == "__main__":
     parser.add_argument("--stop", type=str, nargs='*', metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
-    parser.add_argument("-z", "--compress",action='store_true', help='request api server to use gzip encoding')
+    parser.add_argument("-z", "--compress", action='store_true', help='request api server to use gzip encoding')
 
     # set up coloring with colorama
     terminal = os.getenv('TERM')
@@ -671,9 +696,9 @@ if __name__ == "__main__":
     #print args; sys.exit()
     
     if args.api_key:
-        jsi = JustSeedIt(args.api_key);
+        jsi = JustSeedIt(args.api_key)
     else:
-        jsi = JustSeedIt();
+        jsi = JustSeedIt()
     
     if args.debug:
         jsi.debug = 1
@@ -691,10 +716,10 @@ if __name__ == "__main__":
         jsi.dry_run = 1
          
     if args.aria2_options:
-        jsi.aria2_options = output_dir
+        jsi.aria2_options = args.aria2_options
 
     if args.output_dir:
-        jsi.output_dir = output_dir
+        jsi.output_dir = args.output_dir
         
     if args.ratio:
         jsi.ratio = args.ratio
@@ -716,41 +741,41 @@ if __name__ == "__main__":
         jsi.list()
         
     elif args.info:
-        jsi.info(args.info);
+        jsi.info(args.info)
 
     elif args.edit:
-        jsi.edit(args.edit);
+        jsi.edit(args.edit)
  
-    elif args.infomap:
-        jsi.info_map();
+    #elif args.infomap:
+    #    jsi.info_map()
 
     elif args.pieces:
-        print jsi.pieces(args.pieces);
+        print jsi.pieces(args.pieces)
 
     elif args.start:
-        jsi.start(args.start);
+        jsi.start(args.start)
 
     elif args.stop:
-        jsi.stop(args.stop);       
+        jsi.stop(args.stop)
 
     #elif args.delete:
         #print "Not implemented"
-        #print jsi.delete(args.delete);      
+        #print jsi.delete(args.delete)
  
     elif args.bitfield:
-        jsi.pretty_print(jsi.bitfield(args.bitfield));
+        jsi.pretty_print(jsi.bitfield(args.bitfield))
 
     elif args.trackers:
-        jsi.pretty_print(jsi.trackers(args.trackers));
+        jsi.pretty_print(jsi.trackers(args.trackers))
         
     elif args.peers:
-        jsi.pretty_print(jsi.peers(args.peers));
+        jsi.pretty_print(jsi.peers(args.peers))
          
     elif args.files:
-        jsi.pretty_print(jsi.files(args.files));
+        jsi.pretty_print(jsi.files(args.files))
 
     elif args.download_links:
-        urls = jsi.download_links(args.download_links);
+        urls = jsi.download_links(args.download_links)
         for line in urls:
             print line
  
@@ -767,4 +792,3 @@ if __name__ == "__main__":
         raw_input("Press Enter to continue...")
         
     sys.exit()
-   
