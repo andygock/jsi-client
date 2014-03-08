@@ -618,7 +618,6 @@ if __name__ == "__main__":
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c')
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
-    parser.add_argument("--compress", '-z', action='store_true', help='request api server to use gzip encoding')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
     parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
@@ -640,6 +639,7 @@ if __name__ == "__main__":
     parser.add_argument("--stop", type=str, metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
+    parser.add_argument("-z", "--compress",action='store_true', help='request api server to use gzip encoding')
     
     args = parser.parse_args()
     #print args; sys.exit()
