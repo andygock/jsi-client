@@ -11,6 +11,7 @@ To run, it requires the the following packages which are in addition to those st
 - [xmltodict](http://pypi.python.org/pypi/xmltodict/)
 - [poster](http://pypi.python.org/pypi/poster/)
 - [bencode](http://pypi.python.org/pypi/bencode/)
+- [colorama](https://pypi.python.org/pypi/colorama)
 
 They can be easily installed using `pip`. Example `pip install xmltodict` to install xmltodict.
 
