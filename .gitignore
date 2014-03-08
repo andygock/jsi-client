@@ -3,3 +3,7 @@
 *.txt
 *.torrent
 !README*
+dist/
+build/
+*.spec
+
