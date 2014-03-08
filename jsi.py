@@ -69,6 +69,7 @@ class JustSeedIt():
     aria2_options = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 "+\
         "--continue --max-connection-per-server=8 --min-split-size=1M"
     output_dir = 'd:/Downloads/justseed.it Downloads/'
+    ratio = 1.0
     
     def __init__(self, api_key=''):
         self.api_key = "" # start off blank
@@ -104,7 +105,7 @@ class JustSeedIt():
                 sys.exit()
         
         # Set default configs, these may be changed later
-        self.ratio = 1.0
+        
         self.error = False
         self.debug = 0
         self.dry_run = 0
