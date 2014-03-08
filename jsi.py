@@ -86,7 +86,8 @@ class JustSeedIt():
             self.homedir = os.path.expanduser("~")
             
             # Obtain API key
-            for keyfile in (self.homedir + '/.justseedit_apikey', '/.justseedit_apikey'):
+            for keyfile in [self.homedir + '/.justseedit_apikey',\
+                            os.path.dirname(os.path.realpath(__file__)) + '/.justseedit_apikey']:
                 # Try different locations for key file
                 try:
                     f = open(keyfile,'r') 
@@ -641,7 +642,6 @@ if __name__ == "__main__":
     parser.add_argument("--xml", action='store_true', help='display result as XML')
     
     args = parser.parse_args()
-    
     #print args; sys.exit()
     
     if args.api_key:
