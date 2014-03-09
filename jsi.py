@@ -565,7 +565,7 @@ class JustSeedIt():
             self.api("/torrent/add.csp", {'torrent_file': data, 'maximum_ratio': str(self.ratio)})
 
             if self.xml_mode:
-                print self.response_xml
+                print self.xml_response
                 continue
         
         return
