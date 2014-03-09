@@ -418,7 +418,7 @@ class JustSeedIt():
             
             if self.verbose or self.debug:
                 sys.stderr.write("Stopping torrent: {}\n".format(torrent_id))
-            
+
             response_xml = self.api("/torrent/stop.csp", {'info_hash': infohash})
 
             if self.xml_mode:
@@ -452,7 +452,7 @@ class JustSeedIt():
         return response_xml
     
     def download_links(self, infohashes):
-        """ Get download links fsor infohash or ID number.
+        """ Get download links for infohash or ID number.
             Return list of direct download urls.
         """
         # grab list info, so we can get the torrent name
@@ -468,7 +468,7 @@ class JustSeedIt():
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
-                        
+            
             response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
             #response_xml = self.xml_from_file('files.xml') # debug
             result = xmltodict.parse(response_xml)
@@ -621,7 +621,7 @@ class JustSeedIt():
         
         for torrent_id, torrent in self.torrents.items():
             # 'name' is a urlencoded UTF-8 string
-            # clean this up, many consoles can't dusplay UTF-8, so lets replace unknown chars
+            # clean this up, many consoles can't display UTF-8, so lets replace unknown chars
             name = self.urldecode_to_ascii(torrent['name'])
             
             # Print torrent name
