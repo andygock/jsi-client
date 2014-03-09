@@ -623,7 +623,7 @@ class JustSeedIt():
             name = self.urldecode_to_ascii(torrent['name'])
             
             # Print torrent name
-            print Fore.CYAN + "[{:>3}] {}".format(torrent['@id'], name) + Fore.RESET
+            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(torrent['@id']) + Fore.CYAN + "] {}".format(name) + Fore.RESET
             
             if float(torrent['downloaded_as_bytes']) == 0:
                 ratio = 0.0
@@ -660,7 +660,7 @@ if __name__ == "__main__":
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
     #parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
-    parser.add_argument("--download-links", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
+    parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
@@ -720,6 +720,10 @@ if __name__ == "__main__":
 
     if args.output_dir:
         jsi.output_dir = args.output_dir
+    else:
+        # output dir can be defined in env
+        if os.getenv('JSI_OUTPUT_DIR'):
+            jsi.output_dir = os.getenv('JSI_OUTPUT_DIR')
         
     if args.ratio:
         jsi.ratio = args.ratio
@@ -781,7 +785,10 @@ if __name__ == "__main__":
  
     elif args.aria2:
         if args.aria2_options:
-            jsi.aria2_options = args.aria2_options     
+            jsi.aria2_options = args.aria2_options
+        elif os.getenv('JSI_ARIA2_OPTIONS'):
+            jsi.aria2_options = os.getenv('JSI_ARIA2_OPTIONS')
+
                
         jsi.aria2_script(args.aria2)
                                
