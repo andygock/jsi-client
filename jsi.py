@@ -18,11 +18,11 @@ import argparse
 import poster
 import collections
 import re
-import zlib
+#import zlib
 import StringIO
 import gzip
 import bencode
-from pprint import pprint
+#from pprint import pprint
 from colorama import init, Fore, Back, Style
 
 JSI_VERSION = "0.0"
@@ -37,13 +37,13 @@ def is_number(s):
     
 
 def hexdump(src, length=16):
-    FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
+    hdfilter = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
     lines = []
     for c in xrange(0, len(src), length):
         chars = src[c:c+length]
-        hex = ' '.join(["%02x" % ord(x) for x in chars])
-        printable = ''.join(["%s" % ((ord(x) <= 127 and FILTER[ord(x)]) or '.') for x in chars])
-        lines.append("%04x  %-*s  %s\n" % (c, length*3, hex, printable))
+        hex_buffer = ' '.join(["%02x" % ord(x) for x in chars])
+        printable = ''.join(["%s" % ((ord(x) <= 127 and hdfilter[ord(x)]) or '.') for x in chars])
+        lines.append("%04x  %-*s  %s\n" % (c, length*3, hex_buffer, printable))
     return ''.join(lines)
         
 
@@ -133,10 +133,12 @@ class JustSeedIt():
         xml = f.read()
         return xml
   
-    def api(self, page, data={}):
+    def api(self, page, data=None):
         """ Make a API call using multipart/form-data POST
             Returns XML response on success or False on error
         """
+        if not data:
+            data = {}
         data['api_key'] = self.api_key
         
         if False:
@@ -498,12 +500,12 @@ class JustSeedIt():
 
         for infohash in infohashes:
             # get download links
-            urls = self.download_links([infohash])
+            url_list = self.download_links([infohash])
     
             if not options:
                 options = self.aria2_options
     
-            for url in urls:
+            for url in url_list:
                 #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
                 file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
                 
@@ -789,7 +791,6 @@ if __name__ == "__main__":
         elif os.getenv('JSI_ARIA2_OPTIONS'):
             jsi.aria2_options = os.getenv('JSI_ARIA2_OPTIONS')
 
-               
         jsi.aria2_script(args.aria2)
                                
     else:
