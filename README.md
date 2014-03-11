@@ -69,9 +69,10 @@ Save download links for torrent with ID #5 and #7 to file `links.txt`:
 
 	jsi.py --download-links 5 7 > links.txt
 	
-Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID #5 and #7, and save to file `aria2-script`
+Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID #5 and #7, and save to file `aria2-script`.
+Ask API server to use gzip compression when sending back data:
 
-	jsi.py --aria2 5 7 > aria2-script
+	jsi.py -z --aria2 5 7 > aria2-script
 	
 And then view and run the aria2-script commands:
 
