@@ -5,14 +5,13 @@ jsi.py
 
 Unofficial justseed.it cli client
 
-
 """
 
 import sys
 import os
 import urllib
 import urllib2
-import xmltodict
+#import xmltodict
 import json
 import argparse
 import poster
@@ -103,7 +102,7 @@ class JustSeedIt():
         self.debug = 0
         self.dry_run = 0
         self.xml_mode = False
-        self.torrents = {}
+        self.torrents = None
         self.compress = False
         self.edit_opts = []
         self.verbose = False
@@ -112,7 +111,10 @@ class JustSeedIt():
 
         self.id_to_infohash_map = collections.OrderedDict()
         self.torrents = collections.OrderedDict()
-        self.info_map = collections.OrderedDict()
+        #self.info_map = collections.OrderedDict()
+
+        self.data_remaining_as_bytes = 0
+        self.data_remaining_as_string = 0
 
     @staticmethod
     def pretty_print(data):
@@ -215,36 +217,27 @@ class JustSeedIt():
         """ Check server response is valid and return True or False. Error is printed to
             stderr if response is not "SUCCESS".
         """
-        result = xmltodict.parse(xml_data)
-        if result['result']['status'] == 'SUCCESS':
+        status = minidom.parseString(xml_data).getElementsByTagName("status")[0].firstChild.nodeValue
+        if status == 'SUCCESS':
             return True
         else:
-            error = urllib.unquote(result['result']['message'])
+            error = urllib.unquote(minidom.parseString(xml_data).getElementsByTagName("message")[0].firstChild.nodeValue)
             sys.stderr.write('Warning: '+error+"\n")
             return False
     
     def id_to_infohash(self, torrent_id):
         """ Find the info hash, when given a ID, returns infohash """
-        #print self.torrents
-        if torrent_id in self.torrents:
-            if 'info_hash' in self.torrents[torrent_id]:
-                return self.torrents[torrent_id]['info_hash']
+        if torrent_id in self.id_to_infohash_map:
+            # There is a matching info hash found for this ID
+            return self.id_to_infohash_map[torrent_id]
+        else:
+            self.list_update()  # Read info from API server
+            if torrent_id in self.id_to_infohash_map:
+                return self.id_to_infohash_map[torrent_id]
             else:
                 sys.stderr.write("Error: No info hash available for ID {}\n".format(torrent_id))
                 return False
 
-        else:
-            self.list_update()  # Read info from API server
-            if torrent_id in self.torrents:
-                if 'info_hash' in self.torrents[torrent_id]:
-                    return self.torrents[torrent_id]['info_hash']
-                else:
-                    sys.stderr.write("Error: No info hash available for ID {}\n".format(torrent_id))
-                    return False
-            else:
-                sys.stderr.write("Error: No such ID number of '{}'\n".format(torrent_id))
-                return False
-    
     def info(self, infohash):
         """ Grab info about a torrent
         """
@@ -253,26 +246,28 @@ class JustSeedIt():
             if not infohash:
                 return
             
-        response_xml = self.api("/torrent/information.csp", {'info_hash': infohash})
+        xml_response = self.api("/torrent/information.csp", {'info_hash': infohash})
         if self.xml_mode:
-            print response_xml
+            print xml_response
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        for k, v in result['result']['data'].items():
-            if k == '@name':
-                continue
-            if v:
-                if k == 'name':
+        data = minidom.parseString(xml_response)
+        for element in data.getElementsByTagName('data')[0].childNodes:
+            if element.nodeType == element.ELEMENT_NODE:
+                key = element.nodeName
+                try:
+                    value = data.getElementsByTagName(element.nodeName)[0].firstChild.nodeValue
+                except AttributeError:
+                    value = ""
+
+                # Print all elements and values
+                if key == 'name':
                     # Replace unicode chars with '-' for torrent name only
-                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v, 'replace'))
+                    print "{:>24}: {:}".format(key, self.urldecode_to_ascii(value, 'replace'))
                 else:
-                    print "{:>24}: {:}".format(k, self.urldecode_to_ascii(v, 'strict'))
-            else:
-                # No value available for this key
-                print "{:>24}:".format(k)
-            
-        return result
+                    print "{:>24}: {:}".format(key, self.urldecode_to_ascii(value, 'strict'))
+
+        return xml_response
 
     @staticmethod
     def urldecode_to_ascii(s, error_opt='replace'):
@@ -294,8 +289,8 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        #result = xmltodict.parse(response_xml)
+        return response_xml
 
     def bitfield(self, infohash):
         if len(infohash) != 40:
@@ -309,8 +304,7 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        return response_xml
 
     def trackers(self, infohash):
         if len(infohash) != 40:
@@ -324,8 +318,7 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        return response_xml
     
     def edit(self, infohashes):
         """ Edit torrent. Can change ratio or name
@@ -378,8 +371,7 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        return response_xml
     
     def start(self, infohashes):
         """ Start torrent(s)
@@ -441,8 +433,7 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
-        result = xmltodict.parse(response_xml)
-        return result
+        return response_xml
  
     def files_xml(self, infohash):
         if len(infohash) != 40:
@@ -461,39 +452,22 @@ class JustSeedIt():
         self.list_update()
 
         url_list = []
-        
+
+        #print self.torrents
+
         for infohash in infohashes:
-            # if ID number is given as arg instead of infohash then
-            # find out the info hash
-            torrent_id = infohash
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
-            
-            response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
-            #response_xml = self.xml_from_file('files.xml') # debug
-            result = xmltodict.parse(response_xml)
-            
-            if 'url' in result['result']['data']['row']:
-                # Single file
-                url_list.append(urllib.unquote(result['result']['data']['row']['url']))
-            else:
-                if len(result['result']['data']['row']):
-                    # Multiple files
-                    for row in result['result']['data']['row']:
-                        if 'url' in row:
-                            if row['url']:  # It could be None if not available, either that or the field is just missing
-                                url_list.append(urllib.unquote(row['url']))
-                else:
-                    # No files for this torrent (possible?)
-                    sys.stderr.write("The torrent '{}' has no files!\n".format(torrent_id))
-                    continue
-                    
-            if len(url_list) == 0:
-                sys.stderr.write("There are no download links available for the torrent '{}'\n".format(torrent_id))
-                continue
-            
+
+        self.api("/torrent/files.csp", {'info_hash': infohash})
+
+        rows = minidom.parseString(self.xml_response).getElementsByTagName("row")
+        self.file_data = rows
+        for row in rows:
+            url_list.append(urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue))
+
         return url_list
 
     def aria2_script(self, infohashes, options=None):
@@ -502,31 +476,40 @@ class JustSeedIt():
 
         for infohash in infohashes:
             # get download links
+
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+
             url_list = self.download_links([infohash])
-    
+
+            # Get torrent name, based in info hash, to use in output dir
+            name = ''
+            for torrent in self.torrents:
+                if torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue == infohash:
+                    name = torrent.getElementsByTagName('name')[0].firstChild.nodeValue
+                    print name
+
+            if name == '':
+                sys.stderr.write("Error: Could not find torrent name, for this info hash. Skipping\n")
+                continue
+
             if not options:
                 options = self.aria2_options
     
             for url in url_list:
-                #file_path = urllib.unquote( re.sub('https://download.justseed\.it/.{40}/','',url) )
                 file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
-                
-                output_dir = self.output_dir
-                
-                if infohash in self.torrents:
-                    if 'name' in self.torrents[infohash]:
-                        output_dir += self.torrents[infohash]['name']
-                        
+                output_dir = self.output_dir + name
                 output_dir = self.urldecode_to_ascii(output_dir)
-                
                 print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
         return
                 
-    def info_map(self):
-        self.list_update()
-        print " ID INFOHASH"
-        for torrent_id, torrent in self.torrents.items():
-            print "{:>3} {}".format(torrent_id, torrent['info_hash'])
+    #def info_map(self):
+    #    self.list_update()
+    #    print " ID INFOHASH"
+    #    for torrent_id, torrent in self.torrents.items():
+    #        print "{:>3} {}".format(torrent_id, torrent['info_hash'])
            
     def add_magnet(self, magnets):
         """ Add magnet links defined in list 'magnets'.
@@ -578,7 +561,7 @@ class JustSeedIt():
         """ Read list information and save in self.torrents
         """
         
-        if len(self.torrents) == 0: 
+        if not self.torrents:
             xml_response = self.api("/torrents/list.csp")
             
             if not xml_response:
@@ -586,26 +569,19 @@ class JustSeedIt():
         
             # Make new maps
             self.id_to_infohash_map = collections.OrderedDict()
-            self.torrents = collections.OrderedDict()
-            self.info_map = collections.OrderedDict()
+            #self.info_map = collections.OrderedDict()
                         
-            result = xmltodict.parse(xml_response)
-                        
-            torrents = result['result']['data']['row']
-            
-            if 'info_hash' in torrents:
-                # Only 1 entry
-                self.id_to_infohash_map[torrents['@id']] = torrents['info_hash']
-                self.torrents[torrents['@id']] = torrents
-            else:
-                # More than 1 entry
-                if len(torrents):
-                    for torrent in torrents:
-                        self.id_to_infohash_map[torrent['@id']] = torrent['info_hash']
-                        self.torrents[torrent['@id']] = torrent
-                else:
-                    # No entries, leave var maps as empty 
-                    pass
+            #result = xmltodict.parse(xml_response)
+
+            #print xml_response
+            self.torrents = minidom.parseString(xml_response).getElementsByTagName("row")
+            for row in self.torrents:
+                # Each torrent
+                self.id_to_infohash_map[row.getAttribute('id')] = row.getElementsByTagName('info_hash')[0].firstChild.nodeValue
+
+            self.data_remaining_as_bytes = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_bytes")[0].firstChild.nodeValue
+            self.data_remaining_as_string = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_string")[0].firstChild.nodeValue
+
         else:
             # list already up to date
             # don't need to do anything
@@ -621,37 +597,40 @@ class JustSeedIt():
             print xml_response
             sys.exit()
         
-        for torrent_id, torrent in self.torrents.items():
+        #for torrent_id, torrent in self.torrents.items():
+        for torrent in self.torrents:
+
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't display UTF-8, so lets replace unknown chars
-            name = self.urldecode_to_ascii(torrent['name'])
-            
+            name = self.urldecode_to_ascii(torrent.getElementsByTagName('name')[0].firstChild.nodeValue)
+            id = torrent.getAttribute("id")
+
             # Print torrent name
-            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(torrent['@id']) + Fore.CYAN + "] {}".format(name) + Fore.RESET
+            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(id) +\
+                  Fore.CYAN + "] {}".format(name) + Fore.RESET
             
-            if float(torrent['downloaded_as_bytes']) == 0:
+            if float(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue) == 0:
                 ratio = 0.0
             else:
-                ratio = float(torrent['uploaded_as_bytes']) / float(torrent['downloaded_as_bytes'])  
+                ratio = float(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue) / float(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
             
-            status = torrent['status']
+            status = torrent.getElementsByTagName('status')[0].firstChild.nodeValue
             if status == 'stopped':
                 # Show progress in RED if stopped
                 status = Fore.RED + status + Fore.RESET
             else:
-                if torrent['percentage_as_decimal'] != "100.0":
+                if torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue != "100.0":
                     # Show status in GREEN, if progress is under 100%
                     status = Fore.GREEN + status + Fore.RESET
                 
-            print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent['size_as_string'],
-                                                                 torrent['percentage_as_decimal'] + "%",
-                                                                 torrent['elapsed_as_string'],
+            print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent.getElementsByTagName('size_as_string')[0].firstChild.nodeValue,
+                                                                 torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue + "%",
+                                                                 torrent.getElementsByTagName('elapsed_as_string')[0].firstChild.nodeValue,
                                                                  ratio,
-                                                                 float(torrent['maximum_ratio_as_decimal']),
+                                                                 float(torrent.getElementsByTagName('maximum_ratio_as_decimal')[0].firstChild.nodeValue),
                                                                  status)
         
-        result = xmltodict.parse(xml_response)
-        print "\nQuota remaining: {}".format(result['result']['data_remaining_as_string'])
+        print "\nQuota remaining: {}".format(self.data_remaining_as_string)
         return
     
 if __name__ == "__main__":
