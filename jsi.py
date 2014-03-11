@@ -24,6 +24,8 @@ import gzip
 import bencode
 #from pprint import pprint
 from colorama import init, Fore, Back, Style
+from collections import OrderedDict
+from xml.dom import minidom
 
 JSI_VERSION = "0.0"
 
@@ -769,16 +771,33 @@ if __name__ == "__main__":
         #print jsi.delete(args.delete)
  
     elif args.bitfield:
-        jsi.pretty_print(jsi.bitfield(args.bitfield))
+        jsi.bitfield(args.bitfield)
+        print "Pieces: " + minidom.parseString(jsi.xml_response).getElementsByTagName('pieces')[0].firstChild.nodeValue
+        print "Bitfield: " + minidom.parseString(jsi.xml_response).getElementsByTagName('bitfield')[0].firstChild.nodeValue
 
     elif args.trackers:
-        jsi.pretty_print(jsi.trackers(args.trackers))
-        
+        jsi.trackers(args.trackers)
+        rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
+        for row in rows:
+            print urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) +\
+                  " Seeders: " + row.getElementsByTagName('seeders')[0].firstChild.nodeValue +\
+                  " Peers: " + row.getElementsByTagName('peers')[0].firstChild.nodeValue +\
+                  " Leechers: " + row.getElementsByTagName('leechers')[0].firstChild.nodeValue
+
     elif args.peers:
-        jsi.pretty_print(jsi.peers(args.peers))
+        data = jsi.peers(args.peers)
+        print "Not implemented yet."
+        #print data['result']['data']
          
     elif args.files:
-        jsi.pretty_print(jsi.files(args.files))
+        # trying out minidom parsing
+        jsi.files(args.files)
+        rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
+        print "Number of files: " + str(len(rows))
+        for row in rows:
+            print "\"" + row.getElementsByTagName('path')[0].firstChild.nodeValue + "\" " +\
+                  row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + " " +\
+                  urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links)
