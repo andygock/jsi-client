@@ -11,19 +11,16 @@ import sys
 import os
 import urllib
 import urllib2
-#import xmltodict
 import json
 import argparse
 import poster
 import collections
 import re
-#import zlib
 import StringIO
 import gzip
 import bencode
 #from pprint import pprint
 from colorama import init, Fore, Back, Style
-from collections import OrderedDict
 from xml.dom import minidom
 
 JSI_VERSION = "0.0"
@@ -103,22 +100,19 @@ class JustSeedIt():
         self.dry_run = 0
         self.xml_mode = False
         self.torrents = None
+        self.file_data = None
         self.compress = False
         self.edit_opts = []
         self.verbose = False
-
         self.xml_response = ''
-
-        self.id_to_infohash_map = collections.OrderedDict()
-        self.torrents = collections.OrderedDict()
-        #self.info_map = collections.OrderedDict()
-
+        self.id_to_infohash_map = {}
+        self.torrents = None
         self.data_remaining_as_bytes = 0
         self.data_remaining_as_string = 0
 
     @staticmethod
-    def pretty_print(data):
-        print(json.dumps(data, indent=4))
+    def pretty_print(d):
+        print(json.dumps(d, indent=4))
 
     @staticmethod
     def quit(message):
@@ -137,18 +131,17 @@ class JustSeedIt():
         xml = f.read()
         return xml
   
-    def api(self, page, data=None):
+    def api(self, page, post_data=None):
         """ Make a API call using multipart/form-data POST
             Returns XML response on success or False on error
         """
-        if not data:
-            data = {}
-        data['api_key'] = self.api_key
+        if not post_data:
+            post_data = {}
+        post_data['api_key'] = self.api_key
         
         if False:
             print "[DEBUG] Calling {:} with:".format(page)
-            for key, value in data.items():
-                #print key, value
+            for key, value in post_data.items():
                 print "{:>15}: {:}".format(key, value)
         
         try:
@@ -158,11 +151,10 @@ class JustSeedIt():
             
             # for multipart/form-data
             poster.streaminghttp.register_openers()
-            post_data, headers = poster.encode.multipart_encode(data)
+            post_data, headers = poster.encode.multipart_encode(post_data)
 
             if self.dry_run:
                 print "\nHeaders:\n"
-                #print headers
                 for k, v in headers.items():
                     print "{}: {}".format(k, v)
                 
@@ -226,7 +218,8 @@ class JustSeedIt():
             return False
     
     def id_to_infohash(self, torrent_id):
-        """ Find the info hash, when given a ID, returns infohash """
+        """ Find the info hash, when given a ID, returns infohash
+        """
         if torrent_id in self.id_to_infohash_map:
             # There is a matching info hash found for this ID
             return self.id_to_infohash_map[torrent_id]
@@ -251,12 +244,12 @@ class JustSeedIt():
             print xml_response
             sys.exit()
 
-        data = minidom.parseString(xml_response)
-        for element in data.getElementsByTagName('data')[0].childNodes:
+        xml = minidom.parseString(xml_response)
+        for element in xml.getElementsByTagName('data')[0].childNodes:
             if element.nodeType == element.ELEMENT_NODE:
                 key = element.nodeName
                 try:
-                    value = data.getElementsByTagName(element.nodeName)[0].firstChild.nodeValue
+                    value = xml.getElementsByTagName(element.nodeName)[0].firstChild.nodeValue
                 except AttributeError:
                     value = ""
 
@@ -283,13 +276,13 @@ class JustSeedIt():
             infohash = self.id_to_infohash(infohash)
             if not infohash:
                 return            
+
         response_xml = self.api("/torrent/pieces.csp", {'info_hash': infohash})
         
         if self.xml_mode:
             print response_xml
             sys.exit()
 
-        #result = xmltodict.parse(response_xml)
         return response_xml
 
     def bitfield(self, infohash):
@@ -453,20 +446,24 @@ class JustSeedIt():
 
         url_list = []
 
-        #print self.torrents
-
         for infohash in infohashes:
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
 
-        self.api("/torrent/files.csp", {'info_hash': infohash})
+            self.api("/torrent/files.csp", {'info_hash': infohash})
+            if self.xml_mode:
+                print self.xml_response
+                continue
 
-        rows = minidom.parseString(self.xml_response).getElementsByTagName("row")
-        self.file_data = rows
-        for row in rows:
-            url_list.append(urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue))
+            downloads = minidom.parseString(self.xml_response).getElementsByTagName("row")
+            self.file_data = downloads
+            for download in downloads:
+                url_list.append(urllib.unquote(download.getElementsByTagName('url')[0].firstChild.nodeValue))
+
+        if self.xml_mode:
+            sys.exit()
 
         return url_list
 
@@ -537,19 +534,19 @@ class JustSeedIt():
             
             try:
                 f = open(filename, 'rb')
-                data = f.read()
+                torrent_data = f.read()
             except IOError:
                 sys.stderr.write("Could not open file '{0}'".format(filename))
                 continue
     
             # Check .torrent file data is valid
             try:
-                bencode.bdecode(data)
-            except bencode.BTL.BTFailure:
+                bencode.bdecode(torrent_data)
+            except bencode.BTFailure:
                 sys.stderr.write("Error: Ignoring '{}', not a valid .torrent file!\n".format(filename))
                 continue
             
-            self.api("/torrent/add.csp", {'torrent_file': data, 'maximum_ratio': str(self.ratio)})
+            self.api("/torrent/add.csp", {'torrent_file': torrent_data, 'maximum_ratio': str(self.ratio)})
 
             if self.xml_mode:
                 print self.xml_response
@@ -567,17 +564,15 @@ class JustSeedIt():
             if not xml_response:
                 return
         
-            # Make new maps
+            # Make new map
             self.id_to_infohash_map = collections.OrderedDict()
-            #self.info_map = collections.OrderedDict()
-                        
-            #result = xmltodict.parse(xml_response)
 
-            #print xml_response
+            # Get all torrent data in xml format
             self.torrents = minidom.parseString(xml_response).getElementsByTagName("row")
-            for row in self.torrents:
+
+            for torrent in self.torrents:
                 # Each torrent
-                self.id_to_infohash_map[row.getAttribute('id')] = row.getElementsByTagName('info_hash')[0].firstChild.nodeValue
+                self.id_to_infohash_map[torrent.getAttribute('id')] = torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue
 
             self.data_remaining_as_bytes = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_bytes")[0].firstChild.nodeValue
             self.data_remaining_as_string = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_string")[0].firstChild.nodeValue
@@ -603,10 +598,10 @@ class JustSeedIt():
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't display UTF-8, so lets replace unknown chars
             name = self.urldecode_to_ascii(torrent.getElementsByTagName('name')[0].firstChild.nodeValue)
-            id = torrent.getAttribute("id")
+            torrent_id = torrent.getAttribute("id")
 
             # Print torrent name
-            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(id) +\
+            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(torrent_id) +\
                   Fore.CYAN + "] {}".format(name) + Fore.RESET
             
             if float(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue) == 0:
@@ -676,8 +671,7 @@ if __name__ == "__main__":
         init(autoreset=True)
 
     args = parser.parse_args()
-    #print args; sys.exit()
-    
+
     if args.api_key:
         jsi = JustSeedIt(args.api_key)
     else:
@@ -759,15 +753,14 @@ if __name__ == "__main__":
         rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
         for row in rows:
             print urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) +\
-                  " Seeders: " + row.getElementsByTagName('seeders')[0].firstChild.nodeValue +\
-                  " Peers: " + row.getElementsByTagName('peers')[0].firstChild.nodeValue +\
-                  " Leechers: " + row.getElementsByTagName('leechers')[0].firstChild.nodeValue
+                " Seeders: " + row.getElementsByTagName('seeders')[0].firstChild.nodeValue +\
+                " Peers: " + row.getElementsByTagName('peers')[0].firstChild.nodeValue +\
+                " Leechers: " + row.getElementsByTagName('leechers')[0].firstChild.nodeValue
 
     elif args.peers:
         data = jsi.peers(args.peers)
         print "Not implemented yet."
-        #print data['result']['data']
-         
+
     elif args.files:
         # trying out minidom parsing
         jsi.files(args.files)
