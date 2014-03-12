@@ -26,7 +26,9 @@ To run, it requires the the following packages which are in addition to those st
 - [bencode](http://pypi.python.org/pypi/bencode/)
 - [colorama](https://pypi.python.org/pypi/colorama)
 
-They can be easily installed using `pip`. Example `pip install xmltodict` to install xmltodict.
+They can be easily installed using `pip`:
+
+	pip install poster bencode colorama
 
 Windows users can use [pip-Win](https://sites.google.com/site/pydatalog/python/pip-for-windows) which makes it very easy to install python packages
 
