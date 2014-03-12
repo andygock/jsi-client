@@ -527,7 +527,11 @@ class JustSeedIt():
             downloads = minidom.parseString(self.xml_response).getElementsByTagName("row")
             self.file_data = downloads
             for download in downloads:
-                url_list.append(urllib.unquote(download.getElementsByTagName('url')[0].firstChild.nodeValue))
+                try:
+                    url_list.append(urllib.unquote(download.getElementsByTagName('url')[0].firstChild.nodeValue))
+                except AttributeError:
+                    # No download link for this file
+                    pass
 
         if self.xml_mode:
             sys.exit()
@@ -542,18 +546,24 @@ class JustSeedIt():
             # get download links
 
             if len(infohash) != 40:
+                torrent_id = infohash
                 infohash = self.id_to_infohash(infohash)
                 if not infohash:
                     continue
+            else:
+                torrent_id = infohash
 
             url_list = self.download_links([infohash])
+
+            if len(url_list) == 0:
+                sys.stderr.write("No download links available for torrent {}.\n".format(torrent_id))
+                continue
 
             # Get torrent name, based in info hash, to use in output dir
             name = ''
             for torrent in self.torrents:
                 if torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue == infohash:
                     name = torrent.getElementsByTagName('name')[0].firstChild.nodeValue
-                    print name
 
             if name == '':
                 sys.stderr.write("Error: Could not find torrent name, for this info hash. Skipping\n")
@@ -836,11 +846,15 @@ if __name__ == "__main__":
         # trying out minidom parsing
         jsi.files(args.files)
         rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
-        print "Number of files: " + str(len(rows))
+        sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
         for row in rows:
-            print "\"" + row.getElementsByTagName('path')[0].firstChild.nodeValue + "\" " +\
-                  row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + " " +\
-                  urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
+            try:
+                url = urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
+            except AttributeError:
+                url = "DOWNLOAD_LINK_NOT_AVAILABLE"
+            print "\"" + urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue) + "\"|" +\
+                  row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + "|" + url
+
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links)
