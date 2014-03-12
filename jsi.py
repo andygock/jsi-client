@@ -6,6 +6,7 @@ jsi.py
 Unofficial justseed.it cli client
 
 """
+JSI_VERSION = "0.0"
 
 import sys
 import os
@@ -19,11 +20,8 @@ import re
 import StringIO
 import gzip
 import bencode
-#from pprint import pprint
 from colorama import init, Fore, Back, Style
 from xml.dom import minidom
-
-JSI_VERSION = "0.0"
 
 
 def is_number(s):
@@ -48,13 +46,28 @@ def hexdump(src, length=16):
 class JustSeedIt():
     
     # Default options
-    
+
+    if os.getenv('JSI_OUTPUT_DIR'):
+        DEFAULT_DOWNLOAD_DIR = os.getenv('JSI_OUTPUT_DIR')
+        # add trailing slash, if not given
+        if DEFAULT_DOWNLOAD_DIR[-1:] != '/':
+            DEFAULT_DOWNLOAD_DIR += '/'
+    else:
+        DEFAULT_DOWNLOAD_DIR = 'd:/Downloads/justseed.it Downloads/'
+
+    if os.getenv('JSI_RATIO'):
+        DEFAULT_RATIO = os.getenv('JSI_RATIO')
+    else:
+        DEFAULT_RATIO = 1.0
+
+    if os.getenv('JSI_ARIA2_OPTIONS'):
+        DEFAULT_ARIA2_OPTIONS = os.getenv('JSI_ARIA2_OPTIONS')
+    else:
+        DEFAULT_ARIA2_OPTIONS = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 " + \
+            "--continue --max-connection-per-server=8 --min-split-size=1M"
+
     DEFAULT_API_SERVER = "https://api.justseed.it"
-    DEFAULT_ARIA2_OPTIONS = "--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 " + \
-        "--continue --max-connection-per-server=8 --min-split-size=1M"
-    DEFAULT_DOWNLOAD_DIR = 'd:/Downloads/justseed.it Downloads/'
-    DEFAULT_RATIO = 1.0
-    
+
     def __init__(self, api_key=''):
         self.api_key = ""  # start off blank
 
@@ -94,7 +107,6 @@ class JustSeedIt():
         self.aria2_options = self.DEFAULT_ARIA2_OPTIONS
         self.output_dir = self.DEFAULT_DOWNLOAD_DIR
         self.ratio = self.DEFAULT_DOWNLOAD_DIR
-        
         self.error = False
         self.debug = 0
         self.dry_run = 0
@@ -103,6 +115,7 @@ class JustSeedIt():
         self.file_data = None
         self.compress = False
         self.edit_opts = []
+        self.name = None
         self.verbose = False
         self.xml_response = ''
         self.id_to_infohash_map = {}
@@ -218,7 +231,7 @@ class JustSeedIt():
             return False
     
     def id_to_infohash(self, torrent_id):
-        """ Find the info hash, when given a ID, returns infohash
+        """ Find the info hash, when given a ID, returns info hash
         """
         if torrent_id in self.id_to_infohash_map:
             # There is a matching info hash found for this ID
@@ -232,7 +245,7 @@ class JustSeedIt():
                 return False
 
     def info(self, infohash):
-        """ Grab info about a torrent
+        """ Grab info about a (single) torrent. Returns XML response
         """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -272,6 +285,8 @@ class JustSeedIt():
         return output
         
     def pieces(self, infohash):
+        """ Display pieces for given info hashes or IDs, returns XML response
+        """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             if not infohash:
@@ -286,6 +301,8 @@ class JustSeedIt():
         return response_xml
 
     def bitfield(self, infohash):
+        """ Display bitfield for given info hashes or IDs, returns XML response
+        """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             if not infohash:
@@ -300,6 +317,8 @@ class JustSeedIt():
         return response_xml
 
     def trackers(self, infohash):
+        """ Display list of trackers for given info hashes or IDs, returns XML response
+        """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             if not infohash:
@@ -314,7 +333,7 @@ class JustSeedIt():
         return response_xml
     
     def edit(self, infohashes):
-        """ Edit torrent. Can change ratio or name
+        """ Edit torrent. Can change ratio or name. Does not return anything.
         """
         
         parameters = self.edit_opts
@@ -345,14 +364,30 @@ class JustSeedIt():
                     print response_xml            
             
             if 'name' in parameters:
-                sys.stderr.write("Not implemented.\n")
-        
+                if torrent_id:
+                    sys.stderr.write("Changing name of torrent {} to \"{}\"\n".format(torrent_id, self.name))
+                else:
+                    sys.stderr.write("Changing name of torrent {} to \"{}\"\n".format(infohash, self.name))
+
+                if self.name != "":
+                    response_xml = self.api("/torrent/set_name.csp",
+                                            {'info_hash': infohash, 'name': self.name})
+                else:
+                    sys.stderr.write("Resetting torrent name to default.\n")
+                    response_xml = self.api("/torrent/set_name.csp",
+                                            {'info_hash': infohash})
+                if self.xml_mode:
+                    print response_xml
+
         if self.xml_mode:
             sys.exit()
             
         return
 
     def peers(self, infohash):
+        """ Display list of peers, returns XML response.
+            Currently not implemented.
+        """
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             if not infohash:
@@ -602,7 +637,7 @@ class JustSeedIt():
 
             # Print torrent name
             print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(torrent_id) +\
-                  Fore.CYAN + "] {}".format(name) + Fore.RESET
+                Fore.CYAN + "] {}".format(name) + Fore.RESET
             
             if float(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue) == 0:
                 ratio = 0.0
@@ -646,8 +681,8 @@ if __name__ == "__main__":
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
-    parser.add_argument("--name", type=float, help='set name (used with -e)')
-    parser.add_argument("-o", "--output-dir", type=str, help='set output dir for aria2 scripts (default: "{}")'.format(JustSeedIt.DEFAULT_DOWNLOAD_DIR))
+    parser.add_argument("--name", type=str, help='set name (used with -e), set as a empty string "" to reset to default name')
+    parser.add_argument("-o", "--output-dir", type=str, help='set output dir for aria2 scripts, always use a trailing slash (default: "{}")'.format(JustSeedIt.DEFAULT_DOWNLOAD_DIR))
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
@@ -657,6 +692,7 @@ if __name__ == "__main__":
     parser.add_argument("--start", type=str, nargs='*', metavar='INFO-HASH', help='start torrent')
     parser.add_argument("--stop", type=str, nargs='*', metavar='INFO-HASH', help='stop torrent')
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
+    parser.add_argument("--version", action='store_true', help='display version number')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
     parser.add_argument("-z", "--compress", action='store_true', help='request api server to use gzip encoding')
 
@@ -682,7 +718,7 @@ if __name__ == "__main__":
         
     if args.verbose:
         jsi.verbose = True
-                
+
     if args.xml:
         jsi.xml_mode = True      
 
@@ -696,20 +732,23 @@ if __name__ == "__main__":
         jsi.aria2_options = args.aria2_options
 
     if args.output_dir:
+        # Add trailing slash if missing
+        if args.output_dir[-1:] != '/':
+            args.output_dir += '/'
         jsi.output_dir = args.output_dir
-    else:
-        # output dir can be defined in env
-        if os.getenv('JSI_OUTPUT_DIR'):
-            jsi.output_dir = os.getenv('JSI_OUTPUT_DIR')
-        
+
     if args.ratio:
         jsi.ratio = args.ratio
         jsi.edit_append('ratio')
 
-    if args.name:
-        sys.stderr.write("--name is not implemented")
+    if args.name or args.name == "":
+        jsi.name = args.name
+        jsi.edit_append('name')
+
+    if args.version:
+        print "Version", JSI_VERSION
         sys.exit()
-        
+
     # Perform main actions
     
     if args.magnet:

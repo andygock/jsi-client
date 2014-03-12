@@ -2,6 +2,18 @@
 
 Command line client for [justseed.it](https://justseed.it) seedbox service.
 
+### Features
+
+- Batch add .torrent files, and set maximum ratio at the same time
+- Add torrents by magnet link
+- Start and stop torrents
+- Change torrent name or maximum ratio
+- Display download links
+- Generate aria2 script
+- Supports requesting and reading gzip compressed data from server
+- Colored console output
+- Works in Windows, Linux and Mac OSX
+
 ## Installation
 
 Thsi is designed and tested on [Python 2.7](http://www.python.org/download/), you'll need it to run this script (exception being if you are downloading a Windows pre-compiled binary of this program).
@@ -10,7 +22,6 @@ Thsi is designed and tested on [Python 2.7](http://www.python.org/download/), yo
 
 To run, it requires the the following packages which are in addition to those standard packages which come with Python:
 
-- [xmltodict](http://pypi.python.org/pypi/xmltodict/)
 - [poster](http://pypi.python.org/pypi/poster/)
 - [bencode](http://pypi.python.org/pypi/bencode/)
 - [colorama](https://pypi.python.org/pypi/colorama)
@@ -25,17 +36,34 @@ Coming soon
 
 ### Setting up PATH
 
-To use jsi.py on the command line, without having to type the full path to jsi.py, the installed path must be in your system path environment variable.
+To use `jsi.py` on the command line, without having to type the full path, the installed path must be in your system path environment variable.
 
-## Set up API key
+### Set up API key
 
-You'll need an API key for use with your justseed.it account. Create a file called `.justseedit_apikey` in your home directory. If this file is not found in your home directory, then it will look for it in the same directory as the running jsi.py. If it is not found in either, it will display an error and quit.
+You'll need an API key for use with your justseed.it account. You can generate one in your options page at the justseed.it site. Create a plain text file called `.justseedit_apikey` in the root of your home directory with the API key in the file.
 
-All the above can be overwritten, and a api key can be specified on the command line using the `--api-key` option. It is not recommended to use this method.
+If this file is not found in your home directory, then the script will look for it in the same directory as the running jsi.py file. If it is not found in either, it will display an error and quit.
+
+All the above can be overwritten, and a api key can be specified on the command line using the `--api-key` option, however it is not recommended to use this method as there may be security implications for doing this.
+
+#### Where is my home directory?
 
 If you're not sure where your home directory on your computer, run the following to find out:
 
 	python -c "import os; print os.path.expanduser('~')"
+
+### Set up default options
+
+There easiest way is to set these up, is to use environment variables:
+
+- `JSI_OUTPUT_DIR` will set the default output directory, for use with aria2 script output. Use a trailing `/` slash.
+- `JSI_RATIO` will set the default ratio used when adding new torrents
+- `JSI_ARIA2_OPTIONS` will set detfault options for aria2 script. Currently this is:
+
+	--file-allocation=none --check-certificate=false --max-concurrent-downloads=8 " + \
+        "--continue --max-connection-per-server=8 --min-split-size=1M
+
+If none of the above are found, then the defaults set in `jsi.py` will be used. Theis is found near the top of the `JustSeedIt` class definition.
 
 ## Show usage options
 
@@ -57,7 +85,7 @@ Add multiple 3 torrent files at the same time, with default ratio:
 
 	jsi.py -t FILE1 FILE2 FILE3
 
-Add all .torrent files from current directory with maximum ratio of 1.0
+Add all .torrent files from current directory and set a maximum ratio of 1.0 for each one:
 
 	jsi.py -r 1.0 -t *.torrent
 	
@@ -74,10 +102,19 @@ Ask API server to use gzip compression when sending back data:
 
 	jsi.py -z --aria2 5 7 > aria2-script
 	
-And then view and run the aria2-script commands:
+And then view and run the aria2-script commands (for Linux and Mac):
 
 	cat aria2-script
 	sh aria2-script
+	
+For Windows users, you may want to create a batch file instead:
+
+	jsi.py -z --aria2 5 7 > aria2-script.bat
+	
+Now check the contents, and run it:
+
+	type aria2-script.bat
+	aria2-script.bat
 	
 Change maximum ratio of torrent #13 to 2.5:
 
@@ -90,4 +127,12 @@ Change maximum ratio of torrent #1, #2 and #3 to 2.5, and show debugging info:
 Change maximum ratio of torrent #1 to #10 inclusive, and #15 to 1.0 (not suitable for windows console):
 
 	jsi.py --ratio 1.0 --edit {0..10} 15
+	
+Start or resume torrent #5:
+
+	jsi.py --start 5
+
+Stop torrent #14:
+
+	jsi.py --stop 14
 	
