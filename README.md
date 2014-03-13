@@ -16,11 +16,11 @@ Command line client for [justseed.it](https://justseed.it) seedbox service.
 
 ## Installation
 
-Thsi is designed and tested on [Python 2.7](http://www.python.org/download/), you'll need it to run this script (exception being if you are downloading a Windows pre-compiled binary of this program).
+This is designed and tested on [Python 2.7](http://www.python.org/download/), you'll probably need this version to run this script (exception being if you are downloading a Windows pre-compiled binary of this program). I haven't tested it on other versions.
 
 ### Using source
 
-To run, it requires the the following packages which are in addition to those standard packages which come with Python:
+To run, it requires the installation of the following packages (which are in addition to those standard packages which come with Python):
 
 - [poster](http://pypi.python.org/pypi/poster/)
 - [bencode](http://pypi.python.org/pypi/bencode/)
@@ -30,11 +30,11 @@ They can be easily installed using `pip`:
 
 	pip install poster bencode colorama
 
-Windows users can use [pip-Win](https://sites.google.com/site/pydatalog/python/pip-for-windows) which makes it very easy to install python packages
+Windows users can use [pip-Win](https://sites.google.com/site/pydatalog/python/pip-for-windows) which makes it very easy to install python packages.
 
 ### Using Windows compiled binary
 
-Coming soon
+Coming soon.
 
 ### Setting up PATH
 
