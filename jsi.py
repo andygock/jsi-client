@@ -144,7 +144,7 @@ class JustSeedIt():
         self.xml_mode = False
         self.torrents = None
         self.file_data = None
-        self.compress = False
+        self.compress = True
         self.verbose = False
         self.xml_response = ''
         self.id_to_infohash_map = {}
@@ -802,6 +802,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("--name", type=str, help='set name (used with -e), set as a empty string "" to reset to default name')
+    parser.add_argument("--no-compress", action='store_true', help='request api server to not use gzip encoding')
     parser.add_argument("-o", "--output-dir", type=str, help='set output dir for aria2 scripts, always use a trailing slash (default: "{}")'.format(JustSeedIt.DEFAULT_DOWNLOAD_DIR))
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
@@ -815,14 +816,13 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action='store_true', help='verbose mode')
     parser.add_argument("--version", action='store_true', help='display version number')
     parser.add_argument("--xml", action='store_true', help='display result as XML')
-    parser.add_argument("-z", "--compress", action='store_true', help='request api server to use gzip encoding')
+    parser.add_argument("-z", "--compress", action='store_true', help='request api server to use gzip encoding (default: True)')
 
     # set up coloring with colorama
     terminal = os.getenv('TERM')
     if terminal == 'rxvt' or terminal == 'xterm':
         # Cygwin, xterm emulators
         init(autoreset=True, convert=False, strip=False)
-        
     else:
         # Standard windows console
         init(autoreset=True)
@@ -843,8 +843,10 @@ if __name__ == "__main__":
     if args.xml:
         jsi.xml_mode = True      
 
-    if args.compress:
-        jsi.compress = True    
+    if args.no_compress:
+        jsi.compress = False
+    else:
+        jsi.compress = True
         
     if args.dry:
         jsi.dry_run = 1
