@@ -154,6 +154,8 @@ class JustSeedIt():
         self.torrents = None
         self.data_remaining_as_bytes = 0
         self.data_remaining_as_string = 0
+        self.add_tracker_url = ''
+        self.delete_tracker_url = ''
 
     @staticmethod
     def pretty_print(d):
@@ -408,6 +410,34 @@ class JustSeedIt():
                     sys.stderr.write("Resetting torrent name to default.\n")
                     response_xml = self.api("/torrent/set_name.csp",
                                             {'info_hash': infohash})
+                if self.xml_mode:
+                    print response_xml
+
+            if 'add_tracker' in parameters:
+                # add tracker url
+                if torrent_id:
+                    sys.stderr.write("Adding tracker \"{}\" to torrent {}\n".format(self.add_tracker_url, torrent_id))
+                else:
+                    sys.stderr.write("Adding tracker \"{}\" to torrent {}\n".format(self.add_tracker_url, infohash))
+
+                if self.add_tracker_url != "":
+                    response_xml = self.api("/torrent/add_tracker.csp",
+                                            {'info_hash': infohash, 'url': self.add_tracker_url})
+
+                if self.xml_mode:
+                    print response_xml
+
+            if 'delete_tracker' in parameters:
+                # add tracker url
+                if torrent_id:
+                    sys.stderr.write("Deleting tracker \"{}\" from torrent {}\n".format(self.delete_tracker_url, torrent_id))
+                else:
+                    sys.stderr.write("Deleting tracker \"{}\" from torrent {}\n".format(self.delete_tracker_url, infohash))
+
+                if self.add_tracker_url != "":
+                    response_xml = self.api("/torrent/delete_tracker.csp",
+                                            {'info_hash': infohash, 'url': self.add_tracker_url})
+
                 if self.xml_mode:
                     print response_xml
 
@@ -732,16 +762,18 @@ class JustSeedIt():
 if __name__ == "__main__":
     # Set up CLI arguments
     parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version ' + JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown in the first column of the --list output.')
-    
+
+    parser.add_argument("--add-tracker", type=str, metavar='TRACKER-URL', help='add tracker (use together with -e)')
     parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
+    parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
     #parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
-    parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with -r or -n')
+    parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with --ratio, --name, --add-tracker or --delete-tracker')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
     parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
@@ -804,9 +836,19 @@ if __name__ == "__main__":
             args.output_dir += '/'
         jsi.output_dir = args.output_dir
 
+    # parameters which can be edited for a torrent
+
     if args.ratio:
         jsi.ratio = args.ratio
         jsi.edit_append('ratio')
+
+    if args.add_tracker:
+        jsi.add_tracker_url = args.add_tracker
+        jsi.edit_append('add_tracker')
+
+    if args.delete_tracker:
+        jsi.delete_tracker_url = args.delete_tracker
+        jsi.edit_append('delete_tracker')
 
     if args.name or args.name == "":
         jsi.name = args.name
