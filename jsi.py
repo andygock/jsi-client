@@ -138,7 +138,6 @@ class JustSeedIt():
         self.url = self.DEFAULT_API_SERVER
         self.aria2_options = self.DEFAULT_ARIA2_OPTIONS
         self.output_dir = self.DEFAULT_DOWNLOAD_DIR
-        self.ratio = self.DEFAULT_DOWNLOAD_DIR
         self.error = False
         self.debug = 0
         self.dry_run = 0
@@ -146,16 +145,20 @@ class JustSeedIt():
         self.torrents = None
         self.file_data = None
         self.compress = False
-        self.edit_opts = []
-        self.name = None
         self.verbose = False
         self.xml_response = ''
         self.id_to_infohash_map = {}
         self.torrents = None
         self.data_remaining_as_bytes = 0
         self.data_remaining_as_string = 0
+
+        # Values used in --edit operations
+        self.edit_opts = []
+        self.ratio = self.DEFAULT_DOWNLOAD_DIR  # this is also used in add, --torrent
+        self.name = None
         self.add_tracker_url = ''
         self.delete_tracker_url = ''
+        self.label = ''
 
     @staticmethod
     def pretty_print(d):
@@ -428,7 +431,7 @@ class JustSeedIt():
                     print response_xml
 
             if 'delete_tracker' in parameters:
-                # add tracker url
+                # delete tracker url
                 if torrent_id:
                     sys.stderr.write("Deleting tracker \"{}\" from torrent {}\n".format(self.delete_tracker_url, torrent_id))
                 else:
@@ -437,6 +440,24 @@ class JustSeedIt():
                 if self.add_tracker_url != "":
                     response_xml = self.api("/torrent/delete_tracker.csp",
                                             {'info_hash': infohash, 'url': self.add_tracker_url})
+
+                if self.xml_mode:
+                    print response_xml
+
+            if 'label' in parameters:
+                # edit label of torrent
+                if torrent_id:
+                    sys.stderr.write("Adding label \"{}\" to torrent {}\n".format(self.label, torrent_id))
+                else:
+                    sys.stderr.write("Adding label \"{}\" to torrent {}\n".format(self.label, infohash))
+
+                if self.add_tracker_url != "":
+                    response_xml = self.api("/torrent/label.csp",
+                                            {'info_hash': infohash, 'url': self.label})
+                else:
+                    # remove label
+                    response_xml = self.api("/torrent/label.csp",
+                                            {'info_hash': infohash})
 
                 if self.xml_mode:
                     print response_xml
@@ -777,6 +798,7 @@ if __name__ == "__main__":
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
     parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
+    parser.add_argument("--label", type=str, metavar='LABEL', help='edit labelm set to "" to remove label')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("--name", type=str, help='set name (used with -e), set as a empty string "" to reset to default name')
@@ -853,6 +875,10 @@ if __name__ == "__main__":
     if args.name or args.name == "":
         jsi.name = args.name
         jsi.edit_append('name')
+
+    if args.label or args.label == "":
+        jsi.label = args.label
+        jsi.edit_append('label')
 
     if args.version:
         print "Version", JSI_VERSION
