@@ -54,6 +54,7 @@ import gzip
 import bencode
 from colorama import init, Fore, Back, Style
 from xml.dom import minidom
+from datetime import datetime
 
 
 def is_number(s):
@@ -152,6 +153,8 @@ class JustSeedIt():
         self.data_remaining_as_bytes = 0
         self.data_remaining_as_string = 0
 
+        self.debug_logfile='debug.log'
+
         # Values used in --edit operations
         self.edit_opts = []
         self.ratio = self.DEFAULT_DOWNLOAD_DIR  # this is also used in add, --torrent
@@ -180,7 +183,17 @@ class JustSeedIt():
         f = open(filename, 'r')
         xml = f.read()
         return xml
-  
+
+    def debug_log(self, data, marker=None):
+        f = open(self.debug_logfile, 'a')
+        if marker:
+            datestr = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write("\n[{} -- {}]\n".format(datestr, marker))
+        if data != '':
+            f.write(data + "\n")
+        f.close()
+        return
+
     def api(self, page, post_data=None):
         """ Make a API call using multipart/form-data POST
             Returns XML response on success or False on error
@@ -189,10 +202,14 @@ class JustSeedIt():
             post_data = {}
         post_data['api_key'] = self.api_key
         
-        if False:
-            print "[DEBUG] Calling {:} with:".format(page)
+        if self.debug:
+            self.debug_log("Calling {:} with:".format(page),"API CALL")
             for key, value in post_data.items():
-                print "{:>15}: {:}".format(key, value)
+                if key == 'torrent_file':
+                    # don't dump torrent file data into log file
+                    self.debug_log("{:>15}: {:}".format(key, "[binary data]"))
+                else:
+                    self.debug_log("{:>15}: {:}".format(key, value))
         
         try:
             # for application/x-www-form-urlencoded
@@ -239,6 +256,10 @@ class JustSeedIt():
 
             # Store xml for later use, maybe we might use it
             self.xml_response = xml_response
+
+            if self.debug:
+                self.debug_log("","XML RESPONSE")
+                self.debug_log(xml_response)
 
         except urllib2.URLError, urllib2.HTTPError:
             sys.stderr.write("Error: URL or HTTP error\n")
@@ -789,7 +810,7 @@ if __name__ == "__main__":
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
-    parser.add_argument("-d", "--debug", action='store_true', help='debug mode')
+    parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
     parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
     #parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
@@ -800,6 +821,8 @@ if __name__ == "__main__":
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("--label", type=str, metavar='LABEL', help='edit labelm set to "" to remove label')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
+    parser.add_argument("--list-tags", action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument("--list-variables", action='store_true', help=argparse.SUPPRESS)
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
     parser.add_argument("--name", type=str, help='set name (used with -e), set as a empty string "" to reset to default name')
     parser.add_argument("--no-compress", action='store_true', help='request api server to not use gzip encoding')
@@ -965,7 +988,14 @@ if __name__ == "__main__":
             jsi.aria2_options = os.getenv('JSI_ARIA2_OPTIONS')
 
         jsi.aria2_script(args.aria2)
-                               
+
+    elif args.list_tags:
+        jsi.api("/tags/list.csp")
+
+    elif args.list_variables:
+        jsi.api("/variables/list.csp")
+
+
     else:
         parser.print_help()
         

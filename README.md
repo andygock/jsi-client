@@ -119,7 +119,7 @@ Change maximum ratio of torrent #13 to 2.5:
 
 	jsi.py -r 2.5 -e 13
 	
-Change maximum ratio of torrent #1, #2 and #3 to 2.5, and show debugging info:
+Change maximum ratio of torrent #1, #2 and #3 to 2.5, and log debugging info:
 	
 	jsi.py --debug --ratio 2.5 --edit 1 2 3
 	

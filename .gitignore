@@ -17,3 +17,5 @@ build/
 
 !LICENSE.TXT
 !README*
+
+debug.log
