@@ -1,9 +1,19 @@
-.*api_key
+# API key
+.*apikey
+
+# Test files
 *.xml
-*.txt
 *.torrent
-!README*
+*.sh
+*.bat
+
+# PyInstaller files
+*.spec
 dist/
 build/
-*.spec
+
+# pycharm files
+.idea/
+
 !LICENSE.TXT
+!README*
