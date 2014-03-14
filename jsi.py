@@ -432,7 +432,31 @@ class JustSeedIt():
             sys.exit()
 
         return response_xml
-    
+
+    def reset(self, infohashes):
+        """ Reset downloaded, uploaded, ratio counter for torrent(s)
+        """
+
+        self.list_update()
+
+        for infohash in infohashes:
+            torrent_id = infohash
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+
+            if self.verbose or self.debug:
+                sys.stderr.write("Resetting torrent: {}\n".format(torrent_id))
+
+            response_xml = self.api("/torrent/reset.csp", {'info_hash': infohash})
+
+            if self.xml_mode:
+                print response_xml
+                continue
+
+        return
+
     def start(self, infohashes):
         """ Start torrent(s)
         """
@@ -728,6 +752,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
+    parser.add_argument("--reset", type=str, metavar='INFO-HASH', help='reset downloaded and uploaded counter for torrent, will also reset the ratio')
     parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
     parser.add_argument("-r", "--ratio", type=float, help='set maximum ratio, used in conjunction with -t, -m or -e (default: {})'.format(str(JustSeedIt.DEFAULT_RATIO)))
@@ -820,6 +845,9 @@ if __name__ == "__main__":
     elif args.stop:
         jsi.stop(args.stop)
 
+    elif args.reset:
+        jsi.reset(args.reset)
+
     #elif args.delete:
         #print "Not implemented"
         #print jsi.delete(args.delete)
@@ -854,7 +882,6 @@ if __name__ == "__main__":
                 url = "DOWNLOAD_LINK_NOT_AVAILABLE"
             print "\"" + urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue) + "\"|" +\
                   row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + "|" + url
-
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links)
