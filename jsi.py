@@ -687,11 +687,12 @@ class JustSeedIt():
     #    for torrent_id, torrent in self.torrents.items():
     #        print "{:>3} {}".format(torrent_id, torrent['info_hash'])
 
-    def glob_expand(self, list):
+    @staticmethod
+    def glob_expand(arguments):
         """ On Windows console, it does not glob *.torrent - so lets do it manually
         """
         globbed_list = []
-        for item in list:
+        for item in arguments:
             items = glob.glob(item)
             if len(items) == 0:
                 sys.stderr.write("Could not find file '{0}'".format(item))
@@ -984,7 +985,18 @@ if __name__ == "__main__":
 
     elif args.peers:
         data = jsi.peers(args.peers)
-        print "Not implemented yet."
+        peers = minidom.parseString(data).getElementsByTagName("row")
+        if len(peers):
+            print "Connected Peers:"
+            for peer in peers:
+                peer_direction = peer.getElementsByTagName('direction')[0].firstChild.nodeValue
+                peer_ip = peer.getElementsByTagName('ip_address')[0].firstChild.nodeValue
+                peer_port = peer.getElementsByTagName('port')[0].firstChild.nodeValue
+                peer_id = peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue
+                peer_percentage = peer.getElementsByTagName('percentage')[0].firstChild.nodeValue
+                print "{:>3} {:>5} {:>5}% {}:{}".format(peer_direction, peer_id, peer_percentage, peer_ip, peer_port)
+        else:
+            sys.stderr.write("There are no connected peers for this torrent.\n")
 
     elif args.files:
         # trying out minidom parsing
@@ -1017,7 +1029,6 @@ if __name__ == "__main__":
 
     elif args.list_variables:
         jsi.api("/variables/list.csp")
-
 
     else:
         parser.print_help()
