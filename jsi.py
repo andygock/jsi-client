@@ -55,7 +55,8 @@ import bencode
 from colorama import init, Fore, Back, Style
 from xml.dom import minidom
 from datetime import datetime
-
+import platform
+import glob
 
 def is_number(s):
     try:
@@ -157,11 +158,16 @@ class JustSeedIt():
 
         # Values used in --edit operations
         self.edit_opts = []
-        self.ratio = self.DEFAULT_DOWNLOAD_DIR  # this is also used in add, --torrent
+        self.ratio = self.DEFAULT_RATIO  # this is also used in add, --torrent
         self.name = None
         self.add_tracker_url = ''
         self.delete_tracker_url = ''
         self.label = ''
+
+        if platform.system() == "Windows":
+            self._globbing = True
+        else:
+            self._globbing = False
 
     @staticmethod
     def pretty_print(d):
@@ -680,7 +686,20 @@ class JustSeedIt():
     #    print " ID INFOHASH"
     #    for torrent_id, torrent in self.torrents.items():
     #        print "{:>3} {}".format(torrent_id, torrent['info_hash'])
-           
+
+    def glob_expand(self, list):
+        """ On Windows console, it does not glob *.torrent - so lets do it manually
+        """
+        globbed_list = []
+        for item in list:
+            items = glob.glob(item)
+            if len(items) == 0:
+                sys.stderr.write("Could not find file '{0}'".format(item))
+                continue
+            for x in items:
+                globbed_list.append(x)
+        return globbed_list
+
     def add_magnet(self, magnets):
         """ Add magnet links defined in list 'magnets'.
             Doesn't return anything
@@ -700,7 +719,11 @@ class JustSeedIt():
         """ Add .torrent files to system. 'filenames' is a list of filenames.
             Doesn't return anything.
         """
-        
+
+        if self._globbing:
+            # We need to manually glob
+            filenames = self.glob_expand(filenames)
+
         for filename in filenames:
         
             sys.stderr.write("Adding torrent file '{}' with ratio {}\n".format(filename, self.ratio))
