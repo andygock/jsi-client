@@ -143,6 +143,7 @@ class JustSeedIt():
         self.error = False
         self.debug = 0
         self.dry_run = 0
+        self.aria2_log = False
         self.xml_mode = False
         self.torrents = None
         self.file_data = None
@@ -154,7 +155,8 @@ class JustSeedIt():
         self.data_remaining_as_bytes = 0
         self.data_remaining_as_string = 0
 
-        self.debug_logfile='debug.log'
+        self.debug_logfile = 'debug.log'
+        self.aria2_logfile = 'aria2.log'
 
         # Values used in --edit operations
         self.edit_opts = []
@@ -673,6 +675,9 @@ class JustSeedIt():
 
             if not options:
                 options = self.aria2_options
+
+            if self.aria2_log:
+                options += " --log-level=notice --log='" + self.aria2_logfile + "'"
     
             for url in url_list:
                 file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
@@ -832,6 +837,7 @@ if __name__ == "__main__":
     parser.add_argument("--add-tracker", type=str, metavar='TRACKER-URL', help='add tracker (use together with -e)')
     parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
+    parser.add_argument("--aria2-log", action='store_true', help='log aria2 messages to aria2.log')
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
@@ -897,7 +903,10 @@ if __name__ == "__main__":
         
     if args.dry:
         jsi.dry_run = 1
-         
+
+    if args.aria2_log:
+        jsi.aria2_log = True
+
     if args.aria2_options:
         jsi.aria2_options = args.aria2_options
 

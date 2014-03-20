@@ -19,3 +19,4 @@ build/
 !README*
 
 debug.log
+aria2.log
