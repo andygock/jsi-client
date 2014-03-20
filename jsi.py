@@ -673,11 +673,11 @@ class JustSeedIt():
                 sys.stderr.write("Error: Could not find torrent name, for this info hash. Skipping\n")
                 continue
 
-            if not options:
-                options = self.aria2_options
+            #if not options:
+            options = self.aria2_options
 
             if self.aria2_log:
-                options += " --log-level=notice --log='" + self.aria2_logfile + "'"
+                options += " --log-level=notice --log=" + self.aria2_logfile + ""
     
             for url in url_list:
                 file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
