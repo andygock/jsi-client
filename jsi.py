@@ -409,6 +409,8 @@ class JustSeedIt():
         if not isinstance(infohashes, list):
             infohashes = [infohashes]
 
+        infohashes = self.expand(infohashes)
+
         for infohash in infohashes:
             torrent_id = False
             if len(infohash) != 40:
@@ -519,6 +521,8 @@ class JustSeedIt():
 
         self.list_update()
 
+        infohashes = self.expand(infohashes)
+
         for infohash in infohashes:
             torrent_id = infohash
             if len(infohash) != 40:
@@ -543,6 +547,8 @@ class JustSeedIt():
 
         self.list_update()
 
+        infohashes = self.expand(infohashes)
+
         for infohash in infohashes:
             torrent_id = infohash
             if len(infohash) != 40:
@@ -566,6 +572,8 @@ class JustSeedIt():
         """
 
         self.list_update()
+
+        infohashes = self.expand(infohashes)
 
         for infohash in infohashes:
             torrent_id = infohash
@@ -617,6 +625,8 @@ class JustSeedIt():
 
         url_list = []
 
+        infohashes = self.expand(infohashes)
+
         for infohash in infohashes:
             if len(infohash) != 40:
                 infohash = self.id_to_infohash(infohash)
@@ -642,9 +652,32 @@ class JustSeedIt():
 
         return url_list
 
+    @staticmethod
+    def expand(original):
+        """ Expands ['5..8'] to ['5','6','7','8']
+        """
+        if len(original) == 1:
+            result = re.match("([0-9]+)\.\.([0-9]+)",original[0])
+
+            if result:
+                matched = result.groups()
+                if len(matched) == 2:
+                    output = []
+                    for n in range(int(matched[0]), int(matched[1])+1):
+                        output.append(str(n))
+                    return output
+                else:
+                    return original
+            else:
+                return original
+        else:
+            # no change
+            return original
+
     def aria2_script(self, infohashes, options=None):
         """ Generate a aria2 download script for selected infohash or id number
         """
+        infohashes = self.expand(infohashes)
 
         for infohash in infohashes:
             # get download links
