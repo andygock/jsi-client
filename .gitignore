@@ -8,9 +8,10 @@
 *.bat
 
 # PyInstaller files
-*.spec
 dist/
 build/
+jsi.zip
+!build-dist.bat
 
 # pycharm files
 .idea/
