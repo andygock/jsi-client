@@ -882,9 +882,9 @@ class JustSeedIt():
                                                                  float(torrent.getElementsByTagName('maximum_ratio_as_decimal')[0].firstChild.nodeValue),
                                                                  status)
         
-        print "\nQuota remaining: " + Fore.RED + "{}".format(sizeof_fmt(int(self.data_remaining_as_bytes))) + Fore.RESET
-        print "List downloaded: " + Fore.RED + "{}".format(sizeof_fmt(total_downloaded)) + Fore.RESET
-        print "List uploaded: " + Fore.RED + "{}".format(sizeof_fmt(total_uploaded)) + Fore.RESET
+        print "\nQuota remaining: " + Fore.RED + "{}".format(sizeof_fmt(int(self.data_remaining_as_bytes))) + Fore.RESET +\
+            " Downloaded: " + Fore.RED + "{}".format(sizeof_fmt(total_downloaded)) + Fore.RESET +\
+            " Uploaded: " + Fore.RED + "{}".format(sizeof_fmt(total_uploaded)) + Fore.RESET
         return
     
 if __name__ == "__main__":
