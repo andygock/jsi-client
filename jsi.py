@@ -1058,9 +1058,18 @@ if __name__ == "__main__":
                 peer_direction = peer.getElementsByTagName('direction')[0].firstChild.nodeValue
                 peer_ip = peer.getElementsByTagName('ip_address')[0].firstChild.nodeValue
                 peer_port = peer.getElementsByTagName('port')[0].firstChild.nodeValue
-                peer_id = peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue
+                peer_id = jsi.urldecode_to_ascii(peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue)
                 peer_percentage = peer.getElementsByTagName('percentage')[0].firstChild.nodeValue
-                print "{:>3} {:>5} {:>5}% {}:{}".format(peer_direction, peer_id, peer_percentage, peer_ip, peer_port)
+                if float(peer_percentage) == 100.0:
+                    print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
+                          Fore.GREEN + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
+                          Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + ":{}".format(peer_port) + Fore.RESET
+                else:
+                    print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
+                          Fore.RED + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
+                          Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + ":{}".format(peer_port) + Fore.RESET
+            print "Total connected peers: {}".format(len(peers))
+
         else:
             sys.stderr.write("There are no connected peers for this torrent.\n")
 
