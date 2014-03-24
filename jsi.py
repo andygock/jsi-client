@@ -52,6 +52,7 @@ import re
 import StringIO
 import gzip
 import bencode
+import math
 from colorama import init, Fore, Back, Style
 from xml.dom import minidom
 from datetime import datetime
@@ -852,8 +853,17 @@ class JustSeedIt():
                 if torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue != "100.0":
                     # Show status in GREEN, if progress is under 100%
                     status = Fore.GREEN + status + Fore.RESET
-                
-            print "{:>30} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent.getElementsByTagName('size_as_string')[0].firstChild.nodeValue,
+
+            # ammend in/out rate to status string
+            rate_in = torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue
+            rate_out = torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue
+
+            if math.floor(int(rate_in)):
+                status += " IN:"+Fore.RED+"{}".format(int(rate_in)/1024)+Fore.RESET+"K"
+            if math.floor(int(rate_out)):
+                status += " OUT:"+Fore.RED+"{}".format(int(rate_out)/1024)+Fore.RESET+"K"
+
+            print "{:>13} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent.getElementsByTagName('size_as_string')[0].firstChild.nodeValue,
                                                                  torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue + "%",
                                                                  torrent.getElementsByTagName('elapsed_as_string')[0].firstChild.nodeValue,
                                                                  ratio,
