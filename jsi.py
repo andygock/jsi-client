@@ -77,6 +77,11 @@ def hexdump(src, length=16):
         lines.append("%04x  %-*s  %s\n" % (c, length*3, hex_buffer, printable))
     return ''.join(lines)
         
+def sizeof_fmt(num):
+    for x in ['bytes','KB','MB','GB','TB']:
+        if num < 1024.0:
+            return "%3.1f %s" % (num, x)
+        num /= 1024.0
 
 class JustSeedIt():
     
@@ -827,8 +832,11 @@ class JustSeedIt():
         if self.xml_mode:
             print xml_response
             sys.exit()
-        
-        #for torrent_id, torrent in self.torrents.items():
+
+        # count all listed downloads and uploads
+        total_downloads = 0
+        total_uploads = 0
+
         for torrent in self.torrents:
 
             # 'name' is a urlencoded UTF-8 string
@@ -854,9 +862,13 @@ class JustSeedIt():
                     # Show status in GREEN, if progress is under 100%
                     status = Fore.GREEN + status + Fore.RESET
 
+
+            total_downloaded = int(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
+            total_uploaded = int(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue)
+
             # ammend in/out rate to status string
-            rate_in = torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue
-            rate_out = torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue
+            rate_in = int(torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue)
+            rate_out = int(torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue)
 
             if math.floor(int(rate_in)):
                 status += " IN:"+Fore.RED+"{}".format(int(rate_in)/1024)+Fore.RESET+"K"
@@ -870,7 +882,9 @@ class JustSeedIt():
                                                                  float(torrent.getElementsByTagName('maximum_ratio_as_decimal')[0].firstChild.nodeValue),
                                                                  status)
         
-        print "\nQuota remaining: {}".format(self.data_remaining_as_string)
+        print "\nQuota remaining: " + Fore.RED + "{}".format(sizeof_fmt(int(self.data_remaining_as_bytes))) + Fore.RESET
+        print "List downloaded: " + Fore.RED + "{}".format(sizeof_fmt(total_downloaded)) + Fore.RESET
+        print "List uploaded: " + Fore.RED + "{}".format(sizeof_fmt(total_uploaded)) + Fore.RESET
         return
     
 if __name__ == "__main__":
