@@ -845,8 +845,8 @@ class JustSeedIt():
             torrent_id = torrent.getAttribute("id")
 
             # Print torrent name
-            print Fore.CYAN + "[" + Fore.RESET + "{:>3}".format(torrent_id) +\
-                Fore.CYAN + "] {}".format(name) + Fore.RESET
+            print Fore.CYAN + "[" + Fore.RESET + Style.BRIGHT + "{:>3}".format(torrent_id) +\
+                Style.RESET_ALL + Fore.CYAN + "] {}".format(name) + Fore.RESET
             
             if float(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue) == 0:
                 ratio = 0.0
@@ -861,7 +861,6 @@ class JustSeedIt():
                 if torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue != "100.0":
                     # Show status in GREEN, if progress is under 100%
                     status = Fore.GREEN + status + Fore.RESET
-
 
             total_downloaded = int(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
             total_uploaded = int(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue)
@@ -1063,11 +1062,11 @@ if __name__ == "__main__":
                 if float(peer_percentage) == 100.0:
                     print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
                           Fore.GREEN + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
-                          Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + ":{}".format(peer_port) + Fore.RESET
+                          Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
                 else:
                     print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
                           Fore.RED + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
-                          Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + ":{}".format(peer_port) + Fore.RESET
+                          Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
             print "Total connected peers: {}".format(len(peers))
 
         else:
