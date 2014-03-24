@@ -123,17 +123,17 @@ Change maximum ratio of torrent #1, #2 and #3 to 2.5, and log debugging info:
 	
 	jsi.py --debug --ratio 2.5 --edit 1 2 3
 	
-Change maximum ratio of torrent #1 to #10 inclusive, and #15 to 1.0 (not suitable for Windows console):
+We can use `A..B` format as shorthand to describe a range of integers from A to B. For example, to change maximum ratio of torrent #0 to #10 inclusive, and #15 to 1.0:
 
-	jsi.py --ratio 1.0 --edit {0..10} 15
+	jsi.py --ratio 1.0 --edit 0..10 15
 	
-Start or resume torrent #5:
+Start or resume torrent #5, #6 and #7:
 
-	jsi.py --start 5
+	jsi.py --start 5..7
 
-Stop torrent #14:
+Stop torrent #14 and #17:
 
-	jsi.py --stop 14
+	jsi.py --stop 14 17
 	
 # LICENSE
 	

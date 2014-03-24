@@ -59,6 +59,7 @@ from datetime import datetime
 import platform
 import glob
 
+
 def is_number(s):
     try:
         float(s)
@@ -77,11 +78,13 @@ def hexdump(src, length=16):
         lines.append("%04x  %-*s  %s\n" % (c, length*3, hex_buffer, printable))
     return ''.join(lines)
         
+
 def sizeof_fmt(num):
-    for x in ['bytes','KB','MB','GB','TB']:
+    for x in ['bytes' ,'KB' ,'MB' ,'GB' ,'TB']:
         if num < 1024.0:
             return "%3.1f %s" % (num, x)
         num /= 1024.0
+
 
 class JustSeedIt():
     
@@ -217,7 +220,7 @@ class JustSeedIt():
         post_data['api_key'] = self.api_key
         
         if self.debug:
-            self.debug_log("Calling {:} with:".format(page),"API CALL")
+            self.debug_log("Calling {:} with:".format(page), "API CALL")
             for key, value in post_data.items():
                 if key == 'torrent_file':
                     # don't dump torrent file data into log file
@@ -272,7 +275,7 @@ class JustSeedIt():
             self.xml_response = xml_response
 
             if self.debug:
-                self.debug_log("","XML RESPONSE")
+                self.debug_log("", "XML RESPONSE")
                 self.debug_log(xml_response)
 
         except urllib2.URLError, urllib2.HTTPError:
@@ -508,6 +511,7 @@ class JustSeedIt():
         """ Display list of peers, returns XML response.
             Currently not implemented.
         """
+
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
             if not infohash:
@@ -662,8 +666,10 @@ class JustSeedIt():
     def expand(original):
         """ Expands ['5..8'] to ['5','6','7','8']
         """
+        if not isinstance(original, list):
+            original = [original]
         if len(original) == 1:
-            result = re.match("([0-9]+)\.\.([0-9]+)",original[0])
+            result = re.match("([0-9]+)\.\.([0-9]+)", original[0])
 
             if result:
                 matched = result.groups()
@@ -834,8 +840,8 @@ class JustSeedIt():
             sys.exit()
 
         # count all listed downloads and uploads
-        total_downloads = 0
-        total_uploads = 0
+        total_downloaded = 0
+        total_uploaded = 0
 
         for torrent in self.torrents:
 
@@ -862,8 +868,8 @@ class JustSeedIt():
                     # Show status in GREEN, if progress is under 100%
                     status = Fore.GREEN + status + Fore.RESET
 
-            total_downloaded = int(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
-            total_uploaded = int(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue)
+            total_downloaded += int(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
+            total_uploaded += int(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue)
 
             # ammend in/out rate to status string
             rate_in = int(torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue)
@@ -1035,42 +1041,55 @@ if __name__ == "__main__":
         #print jsi.delete(args.delete)
  
     elif args.bitfield:
-        jsi.bitfield(args.bitfield)
-        print "Pieces: " + minidom.parseString(jsi.xml_response).getElementsByTagName('pieces')[0].firstChild.nodeValue
-        print "Bitfield: " + minidom.parseString(jsi.xml_response).getElementsByTagName('bitfield')[0].firstChild.nodeValue
+        param = jsi.expand(args.bitfield)
+
+        for infohash in param:
+            jsi.bitfield(infohash)
+            print "Bitfield for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL
+            print "  Pieces: " + minidom.parseString(jsi.xml_response).getElementsByTagName('pieces')[0].firstChild.nodeValue
+            print "  Bitfield: " + minidom.parseString(jsi.xml_response).getElementsByTagName('bitfield')[0].firstChild.nodeValue
 
     elif args.trackers:
-        jsi.trackers(args.trackers)
-        rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
-        for row in rows:
-            print urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) +\
-                " Seeders: " + row.getElementsByTagName('seeders')[0].firstChild.nodeValue +\
-                " Peers: " + row.getElementsByTagName('peers')[0].firstChild.nodeValue +\
-                " Leechers: " + row.getElementsByTagName('leechers')[0].firstChild.nodeValue
+        param = jsi.expand(args.trackers)
+
+        for infohash in param:
+            print "Trackers for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL
+            jsi.trackers(infohash)
+            rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
+            for row in rows:
+                print "  " + urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) +\
+                    " S:" + Style.BRIGHT + Fore.GREEN + row.getElementsByTagName('seeders')[0].firstChild.nodeValue + Style.RESET_ALL +\
+                    " P:" + Style.BRIGHT + Fore.CYAN + row.getElementsByTagName('peers')[0].firstChild.nodeValue + Style.RESET_ALL +\
+                    " L:" + Style.BRIGHT + Fore.WHITE + row.getElementsByTagName('leechers')[0].firstChild.nodeValue + Style.RESET_ALL
 
     elif args.peers:
-        data = jsi.peers(args.peers)
-        peers = minidom.parseString(data).getElementsByTagName("row")
-        if len(peers):
-            print "Connected Peers:"
-            for peer in peers:
-                peer_direction = peer.getElementsByTagName('direction')[0].firstChild.nodeValue
-                peer_ip = peer.getElementsByTagName('ip_address')[0].firstChild.nodeValue
-                peer_port = peer.getElementsByTagName('port')[0].firstChild.nodeValue
-                peer_id = jsi.urldecode_to_ascii(peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue)
-                peer_percentage = peer.getElementsByTagName('percentage')[0].firstChild.nodeValue
-                if float(peer_percentage) == 100.0:
-                    print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
-                          Fore.GREEN + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
-                          Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
-                else:
-                    print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
-                          Fore.RED + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
-                          Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
-            print "Total connected peers: {}".format(len(peers))
+        param = jsi.expand(args.peers)
 
-        else:
-            sys.stderr.write("There are no connected peers for this torrent.\n")
+        for infohash in param:
+            data = jsi.peers(infohash)
+            peers = minidom.parseString(data).getElementsByTagName("row")
+            #if len(param):
+            #    print "---"
+            if len(peers):
+                print "Connected Peers for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL + ": {}".format(len(peers))
+                for peer in peers:
+                    peer_direction = peer.getElementsByTagName('direction')[0].firstChild.nodeValue
+                    peer_ip = peer.getElementsByTagName('ip_address')[0].firstChild.nodeValue
+                    peer_port = peer.getElementsByTagName('port')[0].firstChild.nodeValue
+                    peer_id = jsi.urldecode_to_ascii(peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue)
+                    peer_percentage = peer.getElementsByTagName('percentage')[0].firstChild.nodeValue
+                    if float(peer_percentage) == 100.0:
+                        print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
+                              Fore.GREEN + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
+                              Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
+                    else:
+                        print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
+                              Fore.RED + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
+                              Style.BRIGHT + Fore.BLUE + "{}".format(peer_ip) + Fore.RESET + Style.RESET_ALL + ":{}".format(peer_port) + Fore.RESET
+
+            else:
+                print "Connected Peers for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL + ": {}".format(len(peers))
+                continue
 
     elif args.files:
         # trying out minidom parsing
