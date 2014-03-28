@@ -801,6 +801,29 @@ class JustSeedIt():
         
         return
 
+    def add_infohash(self, infohashes):
+        """ Add torrents to system, referenced by infohash
+            Doesn't return anything.
+        """
+
+        for infohash in infohashes:
+
+            sys.stderr.write("Adding infohash '{}' with ratio {}\n".format(infohash, self.ratio))
+
+            # Check infohash is valid string (40 char hexadecimal string)
+            match = re.search("^[0-9A-Fa-f]{40}$", infohash)
+            if not match:
+                sys.stderr.write("Not a valid hash! Skipping \"{}\"...".format(infohash))
+                continue
+
+            self.api("/torrent/add.csp", {'info_hash': infohash, 'maximum_ratio': str(self.ratio)})
+
+            if self.xml_mode:
+                print self.xml_response
+                continue
+
+        return
+
     def list_update(self):
         """ Read list information and save in self.torrents
         """
@@ -910,6 +933,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with --ratio, --name, --add-tracker or --delete-tracker')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
     parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
+    parser.add_argument("--infohash", type=str, nargs='*', metavar='INFO-HASH', help='add torrent by infohash')
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("--label", type=str, metavar='LABEL', help='edit labelm set to "" to remove label')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
@@ -1011,7 +1035,10 @@ if __name__ == "__main__":
         
     elif args.torrent_file:
         jsi.add_torrent_file(args.torrent_file)
-        
+
+    elif args.infohash:
+        jsi.add_infohash(args.infohash)
+
     elif args.list:
         jsi.list()
         
