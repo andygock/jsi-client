@@ -58,6 +58,8 @@ from xml.dom import minidom
 from datetime import datetime
 import platform
 import glob
+import csv
+import io
 
 
 def is_number(s):
@@ -1174,17 +1176,54 @@ if __name__ == "__main__":
                 continue
 
     elif args.files:
+        # write csv output, representing files information
         jsi.files(args.files)
         rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
-        sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
+        #sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
+
+        writer = csv.writer(sys.stdout, dialect='excel')
+
+        #csvout = io.StringIO()
+        #writer = csv.writer(csvout, dialect='excel')
+
+        # write heading
+
+        writer.writerow([
+            'torrent_offset',
+            'start_piece',
+            'start_piece_offset',
+            'end_piece',
+            'end_piece_offset',
+            'path',
+            'size_as_bytes',
+            'total_downloaded_as_bytes',
+            'url'
+        ])
+        
+
         for row in rows:
             try:
                 url = urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
             except AttributeError:
-                url = "DOWNLOAD_LINK_NOT_AVAILABLE"
+                url = ""
 
-            print "\"" + urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue) + "\"|" +\
-                  row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + "|" + url
+            data = (
+                row.getElementsByTagName('torrent_offset')[0].firstChild.nodeValue,
+                row.getElementsByTagName('start_piece')[0].firstChild.nodeValue,
+                row.getElementsByTagName('start_piece_offset')[0].firstChild.nodeValue,
+                row.getElementsByTagName('end_piece')[0].firstChild.nodeValue,
+                row.getElementsByTagName('end_piece_offset')[0].firstChild.nodeValue,
+                urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue),
+                row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue,
+                row.getElementsByTagName('total_downloaded_as_bytes')[0].firstChild.nodeValue,
+                url
+            )
+            writer.writerow(data)
+
+            # extra blank lines written to stdout on Windows, need to fix!
+            # can fix by opening stdout as "wb", but not sure if this is possible?
+
+        #print csvout.getvalue()
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links)
