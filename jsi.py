@@ -1052,7 +1052,23 @@ if __name__ == "__main__":
     #    jsi.info_map()
 
     elif args.pieces:
-        print jsi.pieces(args.pieces)
+        # show pretty list of pieces for this torrent
+        print "Pieces for " + Style.BRIGHT + "{}".format(args.pieces) + Style.RESET_ALL
+        jsi.pieces(args.pieces)
+        rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
+        if len(rows):
+            print "NUMBER HASH SIZE LINK"
+        else:
+            sys.stderr.write("No pieces available for this torrent.\n")
+
+        for row in rows:
+            # hash, number, size, url
+            print "{} {} {} {}".format(
+                Fore.WHITE + row.getElementsByTagName('number')[0].firstChild.nodeValue,
+                Fore.CYAN + row.getElementsByTagName('hash')[0].firstChild.nodeValue,
+                Fore.GREEN + row.getElementsByTagName('size')[0].firstChild.nodeValue,
+                Fore.WHITE + urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) + "&api_key=" + jsi.api_key + Fore.RESET
+            )
 
     elif args.start:
         jsi.start(args.start)
