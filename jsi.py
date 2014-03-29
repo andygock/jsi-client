@@ -375,6 +375,37 @@ class JustSeedIt():
 
         return response_xml
 
+    def pieces_aria2(self, infohash):
+        # get pieces info
+        self.pieces(infohash)
+        pieces = minidom.parseString(self.xml_response).getElementsByTagName("row")
+
+        for piece in pieces:
+            # get useful info / metadata for each piece
+            piece_number = piece.getElementsByTagName('number')[0].firstChild.nodeValue
+            piece_hash = piece.getElementsByTagName('hash')[0].firstChild.nodeValue
+            piece_size = piece.getElementsByTagName('size')[0].firstChild.nodeValue
+            piece_url = urllib.unquote(piece.getElementsByTagName('url')[0].firstChild.nodeValue) + "&api_key=" + self.api_key
+
+            print "aria2c {} -o piece.{} \"{}\"".format(self.aria2_options, piece_number, piece_url)
+
+            # Note: use should perform sha1sum check on each piece
+
+    def pieces_sha1sum(self, infohash):
+        # get pieces info, generate sha1sum output, user uses this to redirect to a sha1sum files
+        # ... > pieces.sha1
+        self.pieces(infohash)
+        pieces = minidom.parseString(self.xml_response).getElementsByTagName("row")
+
+        for piece in pieces:
+            # get useful info / metadata for each piece
+            piece_number = piece.getElementsByTagName('number')[0].firstChild.nodeValue
+            piece_hash = piece.getElementsByTagName('hash')[0].firstChild.nodeValue
+            piece_size = piece.getElementsByTagName('size')[0].firstChild.nodeValue
+            piece_url = urllib.unquote(piece.getElementsByTagName('url')[0].firstChild.nodeValue) + "&api_key=" + self.api_key
+
+            print "{} *pieces.{}".format(piece_hash, piece_number)
+
     def bitfield(self, infohash):
         """ Display bitfield for given info hashes or IDs, returns XML response
         """
@@ -730,7 +761,7 @@ class JustSeedIt():
                 output_dir = self.urldecode_to_ascii(output_dir)
                 print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
         return
-                
+
     #def info_map(self):
     #    self.list_update()
     #    print " ID INFOHASH"
@@ -920,9 +951,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='jsi.py', description='justseed.it cli client, version ' + JSI_VERSION, epilog='When INFO-HASH is asked as a parameter, a torrent ID may also be used. This corresponding ID number is shown in the first column of the --list output.')
 
     parser.add_argument("--add-tracker", type=str, metavar='TRACKER-URL', help='add tracker (use together with -e)')
-    parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading')
+    parser.add_argument("--aria2", type=str, nargs='*', metavar='INFO-HASH', help='generate aria2 script for downloading files')
     parser.add_argument("--aria2-options", type=str, metavar='OPTIONS', help='options to pass to aria2c (default: "{}")'.format(JustSeedIt.DEFAULT_ARIA2_OPTIONS))
-    parser.add_argument("--aria2-log", action='store_true', help='log aria2 messages to aria2.log')
+    parser.add_argument("--aria2-log", action='store_true', help='log aria2 messages to aria2.log, used with --aria2')
     parser.add_argument("--api-key", type=str, metavar='APIKEY', help='specify 40-char api key')
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
@@ -946,6 +977,8 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--pause", action='store_true', help='pause when finished')
     parser.add_argument("--peers", type=str, metavar='INFO-HASH', help='get peers info')
     parser.add_argument("--pieces", type=str, metavar='INFO-HASH', help='get pieces info')
+    parser.add_argument("--pieces-aria2", type=str, metavar='INFO-HASH', help='generate aria2 script to download completed pieces')
+    parser.add_argument("--pieces-sha1sum", type=str, metavar='INFO-HASH', help='generate sha1sums of individual pieces')
     parser.add_argument("--reset", type=str, metavar='INFO-HASH', help='reset downloaded and uploaded counter for torrent, will also reset the ratio')
     parser.add_argument("-t", "--torrent-file", type=str, nargs='*', metavar='TORRENT-FILE', help='add torrent with .torrent file')
     parser.add_argument("--trackers", type=str, metavar='INFO-HASH', help='get trackers info')
@@ -1070,6 +1103,12 @@ if __name__ == "__main__":
                 Fore.WHITE + urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue) + "&api_key=" + jsi.api_key + Fore.RESET
             )
 
+    elif args.pieces_aria2:
+        jsi.pieces_aria2(args.pieces_aria2)
+
+    elif args.pieces_sha1sum:
+        jsi.pieces_sha1sum(args.pieces_sha1sum)
+
     elif args.start:
         jsi.start(args.start)
 
@@ -1135,7 +1174,6 @@ if __name__ == "__main__":
                 continue
 
     elif args.files:
-        # trying out minidom parsing
         jsi.files(args.files)
         rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
         sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
@@ -1144,6 +1182,7 @@ if __name__ == "__main__":
                 url = urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
             except AttributeError:
                 url = "DOWNLOAD_LINK_NOT_AVAILABLE"
+
             print "\"" + urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue) + "\"|" +\
                   row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue + "|" + url
 
