@@ -169,6 +169,8 @@ class JustSeedIt():
         self.debug_logfile = 'debug.log'
         self.aria2_logfile = 'aria2.log'
 
+        self.file_attr = []
+
         # Values used in --edit operations
         self.edit_opts = []
         self.ratio = self.DEFAULT_RATIO  # this is also used in add, --torrent
@@ -422,7 +424,31 @@ class JustSeedIt():
             print response_xml
             sys.exit()
 
+        number_of_pieces = int(minidom.parseString(self.xml_response).getElementsByTagName('pieces')[0].firstChild.nodeValue)
+        bitfield_as_string = minidom.parseString(self.xml_response).getElementsByTagName('bitfield')[0].firstChild.nodeValue
+
+        # generate bitfield as an array
+        bitfield = []
+        for bit in bitfield_as_string:
+            if bit == '1':
+                bitfield.append(1)
+            elif bit == '0':
+                bitfield.append(0)
+            else:
+                sys.stderr.write("Detected invalid bitfield char, expected '0' or '1' but got '{}'".format(bit))
+                sys.exit()
+
+        if len(bitfield) != number_of_pieces:
+            sys.stderr.write("Number of elements in bitfield does not match number of pieces {} != {}".format(len(bitfield),number_of_pieces))
+            sys.exit()
+
+        self.bitfield_array = bitfield
+
+        #print "Bitfield for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL
+        #print "  Pieces: " + str(number_of_pieces)
+        #print "  Bitfield: " + bitfield_as_string
         return response_xml
+
 
     def trackers(self, infohash):
         """ Display list of trackers for given info hashes or IDs, returns XML response
@@ -642,14 +668,97 @@ class JustSeedIt():
             if not infohash:
                 return
 
+        self.bitfield(infohash)  # check bitfield for piece information
+
         response_xml = self.api("/torrent/files.csp", {'info_hash': infohash})
 
         if self.xml_mode:
             print response_xml
             sys.exit()
 
+
+        rows = minidom.parseString(self.xml_response).getElementsByTagName("row")
+        #sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
+
+        for row in rows:
+            try:
+                url = urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
+            except AttributeError:
+                url = ""
+
+            # check whether individual files are completed or not, byt referencing against bitfield
+            start_piece = int(row.getElementsByTagName('start_piece')[0].firstChild.nodeValue)
+            end_piece = int(row.getElementsByTagName('end_piece')[0].firstChild.nodeValue)
+            pieces_complete = 1
+            for p in range(start_piece, end_piece):
+                if jsi.bitfield_array[p] != 1:
+                    pieces_complete = 0
+
+            data = (
+                row.getElementsByTagName('torrent_offset')[0].firstChild.nodeValue,
+                row.getElementsByTagName('start_piece')[0].firstChild.nodeValue,
+                row.getElementsByTagName('start_piece_offset')[0].firstChild.nodeValue,
+                row.getElementsByTagName('end_piece')[0].firstChild.nodeValue,
+                row.getElementsByTagName('end_piece_offset')[0].firstChild.nodeValue,
+                urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue),
+                row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue,
+                row.getElementsByTagName('total_downloaded_as_bytes')[0].firstChild.nodeValue,
+                url,
+                str(pieces_complete)
+            )
+
+            # store it internally too
+            jsi.file_attr.append(data)
+
         return response_xml
- 
+
+    def files_csv(self, infohash=None):
+        # Displayed detailed csv on file information
+        if infohash:
+            self.files(infohash)
+
+        writer = csv.writer(sys.stdout, dialect='excel')
+
+        #csvout = io.StringIO()
+        #writer = csv.writer(csvout, dialect='excel')
+
+        # write heading
+        writer.writerow([
+            'torrent_offset',
+            'start_piece',
+            'start_piece_offset',
+            'end_piece',
+            'end_piece_offset',
+            'path',
+            'size_as_bytes',
+            'total_downloaded_as_bytes',
+            'url',
+            'piece_complete'  # is the piece complete? 0 or 1
+        ])
+
+        # extra blank lines written to stdout on Windows, need to fix!
+        # can fix by opening stdout as "wb", but not sure if this is possible?
+
+        for file in jsi.file_attr:
+            writer.writerow(file)
+
+        #print csvout.getvalue()
+
+    def files_pretty(self, infohash):
+        # Display pretty coloured file info (file path, name and sizes
+        if infohash:
+            self.files(infohash)
+
+        for file in jsi.file_attr:
+            # must use index numbers, see self.files_csv for positions
+            # all fields are string
+            if file[9] == "1":
+                # file complete
+                print "{} {}".format(file[5], Fore.GREEN + file[6] + Fore.RESET)
+            else:
+                # file incomplete
+                print "{} {}".format(file[5], Fore.RED + int(file[6]) + Fore.RESET)
+
     def files_xml(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -964,7 +1073,8 @@ if __name__ == "__main__":
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with --ratio, --name, --add-tracker or --delete-tracker')
-    parser.add_argument("--files", type=str, metavar='INFO-HASH', help='get files info')
+    parser.add_argument("--files", type=str, metavar='INFO-HASH', help='display file names and sizes')
+    parser.add_argument("--files-csv", type=str, metavar='INFO-HASH', help='display detailed file information in csv format')
     parser.add_argument("-i", "--info", type=str, metavar='INFO-HASH', help='show info for torrent')
     parser.add_argument("--infohash", type=str, nargs='*', metavar='INFO-HASH', help='add torrent by infohash')
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
@@ -1129,9 +1239,6 @@ if __name__ == "__main__":
 
         for infohash in param:
             jsi.bitfield(infohash)
-            print "Bitfield for " + Style.BRIGHT + "{}".format(infohash) + Style.RESET_ALL
-            print "  Pieces: " + minidom.parseString(jsi.xml_response).getElementsByTagName('pieces')[0].firstChild.nodeValue
-            print "  Bitfield: " + minidom.parseString(jsi.xml_response).getElementsByTagName('bitfield')[0].firstChild.nodeValue
 
     elif args.trackers:
         param = jsi.expand(args.trackers)
@@ -1176,54 +1283,12 @@ if __name__ == "__main__":
                 continue
 
     elif args.files:
+        # display coloured file name and size info
+        jsi.files_pretty(args.files)
+
+    elif args.files_csv:
         # write csv output, representing files information
-        jsi.files(args.files)
-        rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
-        #sys.stderr.write("Number of files: " + str(len(rows)) + "\n")
-
-        writer = csv.writer(sys.stdout, dialect='excel')
-
-        #csvout = io.StringIO()
-        #writer = csv.writer(csvout, dialect='excel')
-
-        # write heading
-
-        writer.writerow([
-            'torrent_offset',
-            'start_piece',
-            'start_piece_offset',
-            'end_piece',
-            'end_piece_offset',
-            'path',
-            'size_as_bytes',
-            'total_downloaded_as_bytes',
-            'url'
-        ])
-        
-
-        for row in rows:
-            try:
-                url = urllib.unquote(row.getElementsByTagName('url')[0].firstChild.nodeValue)
-            except AttributeError:
-                url = ""
-
-            data = (
-                row.getElementsByTagName('torrent_offset')[0].firstChild.nodeValue,
-                row.getElementsByTagName('start_piece')[0].firstChild.nodeValue,
-                row.getElementsByTagName('start_piece_offset')[0].firstChild.nodeValue,
-                row.getElementsByTagName('end_piece')[0].firstChild.nodeValue,
-                row.getElementsByTagName('end_piece_offset')[0].firstChild.nodeValue,
-                urllib.unquote(row.getElementsByTagName('path')[0].firstChild.nodeValue),
-                row.getElementsByTagName('size_as_bytes')[0].firstChild.nodeValue,
-                row.getElementsByTagName('total_downloaded_as_bytes')[0].firstChild.nodeValue,
-                url
-            )
-            writer.writerow(data)
-
-            # extra blank lines written to stdout on Windows, need to fix!
-            # can fix by opening stdout as "wb", but not sure if this is possible?
-
-        #print csvout.getvalue()
+        jsi.files_csv(args.files_csv)
 
     elif args.download_links:
         urls = jsi.download_links(args.download_links)
