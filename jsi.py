@@ -82,7 +82,7 @@ def hexdump(src, length=16):
         
 
 def sizeof_fmt(num):
-    for x in ['bytes' ,'KB' ,'MB' ,'GB' ,'TB']:
+    for x in ['B' ,'KB' ,'MB' ,'GB' ,'TB']:
         if num < 1024.0:
             return "%3.1f %s" % (num, x)
         num /= 1024.0
@@ -170,6 +170,10 @@ class JustSeedIt():
         self.aria2_logfile = 'aria2.log'
 
         self.file_attr = []
+
+        self.list_incomplete_only = False
+        self.list_complete_only = False
+        self.list_transfer_only = False
 
         # Values used in --edit operations
         self.edit_opts = []
@@ -1008,12 +1012,34 @@ class JustSeedIt():
         total_downloaded = 0
         total_uploaded = 0
 
+        # count total bandwidth current being used
+        total_rate_in = 0
+        total_rate_out = 0
+
+        # count number of items listed
+        list_count = 0
+
         for torrent in self.torrents:
 
             # 'name' is a urlencoded UTF-8 string
             # clean this up, many consoles can't display UTF-8, so lets replace unknown chars
             name = self.urldecode_to_ascii(torrent.getElementsByTagName('name')[0].firstChild.nodeValue)
             torrent_id = torrent.getAttribute("id")
+
+            if self.list_incomplete_only:
+                if torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue == "100.0":
+                    # skip completed torrents
+                    continue
+
+            if self.list_complete_only:
+                if torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue != "100.0":
+                    # skip completed torrents
+                    continue
+
+            if self.list_transfer_only:
+                if int(torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue) == 0 and \
+                    int(torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue) == 0:
+                    continue
 
             # Print torrent name
             print Fore.CYAN + "[" + Fore.RESET + Style.BRIGHT + "{:>3}".format(torrent_id) +\
@@ -1036,6 +1062,9 @@ class JustSeedIt():
             total_downloaded += int(torrent.getElementsByTagName('downloaded_as_bytes')[0].firstChild.nodeValue)
             total_uploaded += int(torrent.getElementsByTagName('uploaded_as_bytes')[0].firstChild.nodeValue)
 
+            total_rate_in += int(torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue)
+            total_rate_out += int(torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue)
+
             # ammend in/out rate to status string
             rate_in = int(torrent.getElementsByTagName('data_rate_in_as_bytes')[0].firstChild.nodeValue)
             rate_out = int(torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue)
@@ -1045,16 +1074,28 @@ class JustSeedIt():
             if math.floor(int(rate_out)):
                 status += " OUT:"+Fore.RED+"{}".format(int(rate_out)/1024)+Fore.RESET+"K"
 
+            #if math.floor(int(rate_in)):
+            #    status += " IN:"+Fore.RED+"{}".format(int(rate_in))+Fore.RESET
+            #if math.floor(int(rate_out)):
+            #    status += " OUT:"+Fore.RED+"{}".format(int(rate_out))+Fore.RESET
+
             print "{:>13} {:>8} {:>12} {:.2f} {:5.2f} {}".format(torrent.getElementsByTagName('size_as_string')[0].firstChild.nodeValue,
                                                                  torrent.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue + "%",
                                                                  torrent.getElementsByTagName('elapsed_as_string')[0].firstChild.nodeValue,
                                                                  ratio,
                                                                  float(torrent.getElementsByTagName('maximum_ratio_as_decimal')[0].firstChild.nodeValue),
                                                                  status)
+
+            list_count += 1
         
-        print "\nQuota remaining: " + Fore.RED + "{}".format(sizeof_fmt(int(self.data_remaining_as_bytes))) + Fore.RESET +\
-            " Downloaded: " + Fore.RED + "{}".format(sizeof_fmt(total_downloaded)) + Fore.RESET +\
+        print ""
+        print "Listed " + Fore.RED + "{}".format(list_count) + Fore.RESET + " torrents"
+        print "Downloaded: " + Fore.RED + "{}".format(sizeof_fmt(total_downloaded)) + Fore.RESET +\
             " Uploaded: " + Fore.RED + "{}".format(sizeof_fmt(total_uploaded)) + Fore.RESET
+        print "Download rate: " + Fore.RED + "{}/s".format(sizeof_fmt(total_rate_in)) + Fore.RESET +\
+            " Upload rate: " + Fore.RED + "{}/s".format(sizeof_fmt(total_rate_out)) + Fore.RESET
+        print "Quota remaining: " + Fore.RED + "{}".format(sizeof_fmt(int(self.data_remaining_as_bytes))) + Fore.RESET
+
         return
     
 if __name__ == "__main__":
@@ -1080,6 +1121,9 @@ if __name__ == "__main__":
     #parser.add_argument("--infomap", action='store_true', help='show ID to infohash map')
     parser.add_argument("--label", type=str, metavar='LABEL', help='edit labelm set to "" to remove label')
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
+    parser.add_argument("--list-complete", action='store_true', help='list only complete torrents')
+    parser.add_argument("--list-incomplete", action='store_true', help='list only incomplete torrents')
+    parser.add_argument("--list-transfer", action='store_true', help='list only torrents with data transfer in progress')
     parser.add_argument("--list-tags", action='store_true', help=argparse.SUPPRESS)
     parser.add_argument("--list-variables", action='store_true', help=argparse.SUPPRESS)
     parser.add_argument("-m", "--magnet", type=str, nargs='*', help="add torrent using magnet link", metavar='MAGNET-TEXT')
@@ -1174,7 +1218,18 @@ if __name__ == "__main__":
         sys.exit()
 
     # Perform main actions
-    
+
+    # Check for problems first, like conflicting commands
+    if (args.list_incomplete or args.list_complete) and args.list:
+        sys.stderr.write("Can not use both --list-incomplete or --list-complete together with --list. Use them on its own.\n")
+        sys.exit()
+
+    if args.list_incomplete and args.list_complete:
+        sys.stderr.write("Can not use both --list-incomplete and --list-complete in the one command\n")
+        sys.exit()
+
+    # No problems
+
     if args.magnet:
         jsi.add_magnet(args.magnet[0])
         
@@ -1186,7 +1241,22 @@ if __name__ == "__main__":
 
     elif args.list:
         jsi.list()
-        
+
+    elif args.list_incomplete:
+        # List only incomplete torrents
+        jsi.list_incomplete_only = True
+        jsi.list()
+
+    elif args.list_complete:
+        # List only 100% completed torrents
+        jsi.list_complete_only = True
+        jsi.list()
+
+    elif args.list_transfer:
+        # List only torrents with data transfers in progress
+        jsi.list_transfer_only = True
+        jsi.list()
+
     elif args.info:
         jsi.info(args.info)
 
