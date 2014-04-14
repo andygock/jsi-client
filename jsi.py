@@ -156,15 +156,15 @@ class JustSeedIt():
         self.dry_run = 0
         self.aria2_log = False
         self.xml_mode = False
-        self.torrents = None
         self.file_data = None
         self.compress = True
         self.verbose = False
-        self.xml_response = ''
-        self.id_to_infohash_map = {}
-        self.torrents = None
-        self.data_remaining_as_bytes = 0
-        self.data_remaining_as_string = 0
+        self.xml_response = ''  # filled with results every time an api call is made
+        self.id_to_infohash_map = {}  # map id number to infohash
+        self.infohash_to_name = {}  # map infohas to torrent name
+        self.torrents = None  # filled when self.list_update() is called
+        self.data_remaining_as_bytes = 0  # remaining quota
+        self.data_remaining_as_string = 0  # remaining quota
 
         self.debug_logfile = 'debug.log'
         self.aria2_logfile = 'aria2.log'
@@ -629,8 +629,8 @@ class JustSeedIt():
                 if not infohash:
                     continue
 
-            if self.verbose or self.debug:
-                sys.stderr.write("Starting torrent: {}\n".format(torrent_id))
+            #if self.verbose or self.debug:
+            sys.stderr.write("Starting torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/start.csp", {'info_hash': infohash})
 
@@ -655,8 +655,8 @@ class JustSeedIt():
                 if not infohash:
                     continue
             
-            if self.verbose or self.debug:
-                sys.stderr.write("Stopping torrent: {}\n".format(torrent_id))
+            #if self.verbose or self.debug:
+            sys.stderr.write("Stopping torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/stop.csp", {'info_hash': infohash})
 
@@ -837,8 +837,13 @@ class JustSeedIt():
         """
         infohashes = self.expand(infohashes)
 
+        self.list_update()
+
+        # grab *all* download links
+        xml_download_links_all = self.api("/links/list.csp")
+
         for infohash in infohashes:
-            # get download links
+            # get info hash
 
             if len(infohash) != 40:
                 torrent_id = infohash
@@ -847,6 +852,35 @@ class JustSeedIt():
                     continue
             else:
                 torrent_id = infohash
+
+            # loop through each row of link list output
+            link_rows = minidom.parseString(jsi.xml_response).getElementsByTagName("row")
+            for row in link_rows:
+
+                link_infohash = row.getElementsByTagName('info_hash')[0].firstChild.nodeValue
+
+                # check for missing infohash
+                if link_infohash == infohash:
+
+                    # found a matching file for the selected infohash
+                    filename = row.getElementsByTagName('filename')[0].firstChild.nodeValue  # not used
+                    url = row.getElementsByTagName('url')[0].firstChild.nodeValue
+
+                    # get torrent name
+                    name = self.infohash_to_name[infohash]
+
+                    # prepare aria2 command line
+                    file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
+                    output_dir = self.output_dir + name
+                    output_dir = self.urldecode_to_ascii(output_dir)
+                    print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
+
+            continue  # go to next infohash
+
+        return
+
+        """
+        # old aria2 script code
 
             url_list = self.download_links([infohash])
 
@@ -876,6 +910,7 @@ class JustSeedIt():
                 output_dir = self.urldecode_to_ascii(output_dir)
                 print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
         return
+        """
 
     #def info_map(self):
     #    self.list_update()
@@ -989,6 +1024,7 @@ class JustSeedIt():
             for torrent in self.torrents:
                 # Each torrent
                 self.id_to_infohash_map[torrent.getAttribute('id')] = torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue
+                self.infohash_to_name[torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue] = torrent.getElementsByTagName('name')[0].firstChild.nodeValue
 
             self.data_remaining_as_bytes = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_bytes")[0].firstChild.nodeValue
             self.data_remaining_as_string = minidom.parseString(xml_response).getElementsByTagName("data_remaining_as_string")[0].firstChild.nodeValue
@@ -999,7 +1035,15 @@ class JustSeedIt():
             pass
         
         return self.xml_response
-                   
+
+    def list_links(self):
+        xml_response = self.api("/links/list.csp")
+        if not xml_response:
+            return
+
+        return self.xml_response
+
+
     def list(self):
         """ Show torrents in pretty format
         """
@@ -1123,6 +1167,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--list", action='store_true', help='list torrents')
     parser.add_argument("--list-complete", action='store_true', help='list only complete torrents')
     parser.add_argument("--list-incomplete", action='store_true', help='list only incomplete torrents')
+    parser.add_argument("--list-links", action='store_true', help='list all download links, xml format')
     parser.add_argument("--list-transfer", action='store_true', help='list only torrents with data transfer in progress')
     parser.add_argument("--list-tags", action='store_true', help=argparse.SUPPRESS)
     parser.add_argument("--list-variables", action='store_true', help=argparse.SUPPRESS)
@@ -1256,6 +1301,10 @@ if __name__ == "__main__":
         # List only torrents with data transfers in progress
         jsi.list_transfer_only = True
         jsi.list()
+
+    elif args.list_links:
+        # List only torrents with data transfers in progress
+        print jsi.list_links()
 
     elif args.info:
         jsi.info(args.info)
