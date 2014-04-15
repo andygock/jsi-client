@@ -864,16 +864,17 @@ class JustSeedIt():
 
                     # found a matching file for the selected infohash
                     filename = row.getElementsByTagName('filename')[0].firstChild.nodeValue  # not used
-                    url = row.getElementsByTagName('url')[0].firstChild.nodeValue
+                    url = self.urldecode_to_ascii(row.getElementsByTagName('url')[0].firstChild.nodeValue)
 
                     # get torrent name
                     name = self.infohash_to_name[infohash]
 
                     # prepare aria2 command line
+                    aria2_options = self.aria2_options
                     file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
                     output_dir = self.output_dir + name
                     output_dir = self.urldecode_to_ascii(output_dir)
-                    print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
+                    print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(aria2_options, output_dir, file_path, url)
 
             continue  # go to next infohash
 
