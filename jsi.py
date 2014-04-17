@@ -603,8 +603,7 @@ class JustSeedIt():
                 if not infohash:
                     continue
 
-            if self.verbose or self.debug:
-                sys.stderr.write("Resetting torrent: {}\n".format(torrent_id))
+            sys.stderr.write("Resetting torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/reset.csp", {'info_hash': infohash})
 
@@ -629,7 +628,6 @@ class JustSeedIt():
                 if not infohash:
                     continue
 
-            #if self.verbose or self.debug:
             sys.stderr.write("Starting torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/start.csp", {'info_hash': infohash})
@@ -655,7 +653,6 @@ class JustSeedIt():
                 if not infohash:
                     continue
             
-            #if self.verbose or self.debug:
             sys.stderr.write("Stopping torrent: {}\n".format(torrent_id))
 
             response_xml = self.api("/torrent/stop.csp", {'info_hash': infohash})
@@ -665,7 +662,32 @@ class JustSeedIt():
                 continue
 
         return
-    
+
+    def delete(self, infohashes):
+        """ Delete torrent(s)
+        """
+
+        self.list_update()
+
+        infohashes = self.expand(infohashes)
+
+        for infohash in infohashes:
+            torrent_id = infohash
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+
+            sys.stderr.write("Deleting torrent: {}\n".format(torrent_id))
+
+            response_xml = self.api("/torrent/delete.csp", {'info_hash': infohash})
+
+            if self.xml_mode:
+                print response_xml
+                continue
+
+        return
+
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -1155,7 +1177,7 @@ if __name__ == "__main__":
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
     parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
-    #parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
+    parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with --ratio, --name, --add-tracker or --delete-tracker')
@@ -1350,9 +1372,8 @@ if __name__ == "__main__":
     elif args.reset:
         jsi.reset(args.reset)
 
-    #elif args.delete:
-        #print "Not implemented"
-        #print jsi.delete(args.delete)
+    elif args.delete:
+        jsi.delete(args.delete)
  
     elif args.bitfield:
         param = jsi.expand(args.bitfield)
