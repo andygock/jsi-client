@@ -76,10 +76,14 @@ Add a single torrent file with maximum ratio of 2.0
 
 	jsi.py -r 2.0 -t FILE
 	
-Check current torrents in system:
+List current torrents in system:
 
 	jsi.py --list
-	
+
+List only incomplete torrents in system:
+
+	jsi.py --list-incomplete
+
 Add multiple 3 torrent files at the same time, with default ratio:
 
 	jsi.py -t FILE1 FILE2 FILE3
@@ -96,10 +100,9 @@ Save download links for torrent with ID #5 and #7 to file `links.txt`:
 
 	jsi.py --download-links 5 7 > links.txt
 	
-Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID #5 and #7, and save to file `aria2-script`.
-Ask API server to use gzip compression when sending back data:
+Generate [aria2](http://aria2.sourceforge.net/) download links for torrent with ID #5 and #7, and save to file `aria2-script`:
 
-	jsi.py -z --aria2 5 7 > aria2-script
+	jsi.py --aria2 5 7 > aria2-script
 	
 And then view and run the aria2-script commands (for Linux and Mac):
 
@@ -108,7 +111,7 @@ And then view and run the aria2-script commands (for Linux and Mac):
 	
 For Windows users, you may want to create a batch file instead:
 
-	jsi.py -z --aria2 5 7 > aria2-script.bat
+	jsi.py --aria2 5 7 > aria2-script.bat
 	
 Now check the contents, and run it:
 
@@ -119,7 +122,7 @@ Change maximum ratio of torrent #13 to 2.5:
 
 	jsi.py -r 2.5 -e 13
 	
-Change maximum ratio of torrent #1, #2 and #3 to 2.5, and log debugging info:
+Change maximum ratio of torrent #1, #2 and #3 to 2.5, and show debugging info:
 	
 	jsi.py --debug --ratio 2.5 --edit 1 2 3
 	
