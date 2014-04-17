@@ -690,6 +690,31 @@ class JustSeedIt():
 
         return
 
+    def download_links_renew(self, infohashes):
+        """ Regenerate download links for torrent
+        """
+
+        self.list_update()
+
+        infohashes = self.expand(infohashes)
+
+        for infohash in infohashes:
+            torrent_id = infohash
+            if len(infohash) != 40:
+                infohash = self.id_to_infohash(infohash)
+                if not infohash:
+                    continue
+
+            sys.stderr.write("Renewing links for torrent: {}\n".format(torrent_id))
+
+            response_xml = self.api("/torrent/links/create.csp", {'info_hash': infohash, 'force': 1})
+
+            if self.xml_mode:
+                print response_xml
+                continue
+
+        return
+
     def files(self, infohash):
         if len(infohash) != 40:
             infohash = self.id_to_infohash(infohash)
@@ -1186,6 +1211,7 @@ if __name__ == "__main__":
     parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
     parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
+    parser.add_argument("--download-links-renew", type=str, metavar='INFO-HASH', help='generate all new download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
     parser.add_argument("-e", "--edit", type=str, nargs='*', metavar='INFO-HASH', help='edit torrent, use with --ratio, --name, --add-tracker or --delete-tracker')
     parser.add_argument("--files", type=str, metavar='INFO-HASH', help='display file names and sizes')
@@ -1448,7 +1474,10 @@ if __name__ == "__main__":
         urls = jsi.download_links(args.download_links)
         for line in urls:
             print line
- 
+
+    elif args.download_links_renew:
+        jsi.download_links_renew(args.download_links_renew)
+
     elif args.aria2:
         if args.aria2_options:
             jsi.aria2_options = args.aria2_options
