@@ -171,8 +171,10 @@ class JustSeedIt():
 
         self.file_attr = []
 
-        self.list_incomplete_only = False
+        # List modifiers
         self.list_complete_only = False
+        self.list_incomplete_only = False
+        self.list_stopped_only = False
         self.list_transfer_only = False
 
         # Values used in --edit operations
@@ -1108,6 +1110,11 @@ class JustSeedIt():
                     int(torrent.getElementsByTagName('data_rate_out_as_bytes')[0].firstChild.nodeValue) == 0:
                     continue
 
+            if self.list_stopped_only:
+                if torrent.getElementsByTagName('status')[0].firstChild.nodeValue != "stopped":
+                    # skip anything that is not stopped
+                    continue
+
             # Print torrent name
             print Fore.CYAN + "[" + Fore.RESET + Style.BRIGHT + "{:>3}".format(torrent_id) +\
                 Style.RESET_ALL + Fore.CYAN + "] {}".format(name) + Fore.RESET
@@ -1191,6 +1198,7 @@ if __name__ == "__main__":
     parser.add_argument("--list-complete", action='store_true', help='list only complete torrents')
     parser.add_argument("--list-incomplete", action='store_true', help='list only incomplete torrents')
     parser.add_argument("--list-links", action='store_true', help='list all download links, xml format')
+    parser.add_argument("--list-stopped", action='store_true', help='list only stopped torrents')
     parser.add_argument("--list-transfer", action='store_true', help='list only torrents with data transfer in progress')
     parser.add_argument("--list-tags", action='store_true', help=argparse.SUPPRESS)
     parser.add_argument("--list-variables", action='store_true', help=argparse.SUPPRESS)
@@ -1318,6 +1326,11 @@ if __name__ == "__main__":
     elif args.list_complete:
         # List only 100% completed torrents
         jsi.list_complete_only = True
+        jsi.list()
+
+    elif args.list_stopped:
+        # List only 100% completed torrents
+        jsi.list_stopped_only = True
         jsi.list()
 
     elif args.list_transfer:
