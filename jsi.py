@@ -1209,7 +1209,7 @@ if __name__ == "__main__":
     parser.add_argument("--bitfield", type=str, metavar='INFO-HASH', help='get bitfield info')
     parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
     parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
-    parser.add_argument("--delete", type=str, metavar='INFO-HASH', help='delete torrent')
+    parser.add_argument("--delete", type=str, nargs='*', metavar='INFO-HASH', help='delete torrent')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--download-links-renew", type=str, metavar='INFO-HASH', help='generate all new download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
