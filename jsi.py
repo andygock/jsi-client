@@ -1333,7 +1333,7 @@ if __name__ == "__main__":
     # No problems
 
     if args.magnet:
-        jsi.add_magnet(args.magnet[0])
+        jsi.add_magnet(args.magnet)
         
     elif args.torrent_file:
         jsi.add_torrent_file(args.torrent_file)
