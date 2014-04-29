@@ -986,8 +986,15 @@ class JustSeedIt():
         """ Add magnet links defined in list 'magnets'.
             Doesn't return anything
         """
+        
+        # if argument is single line string, turn it into a single element list
+        if isinstance(magnets,str):
+            single_magnet = magnets
+            magnets = []
+            magnets.append(single_magnet)
+            
         for magnet in magnets:
-            sys.stderr.write("Adding magnet link with ratio {}\n".format(self.ratio))
+            sys.stderr.write("Adding magnet link \"{}\" with ratio {}\n".format(magnet, self.ratio))
             
             # Check magnet data is valid
             # @todo
@@ -1499,3 +1506,4 @@ if __name__ == "__main__":
         raw_input("Press Enter to continue...")
         
     sys.exit()
+ 

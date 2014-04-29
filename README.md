@@ -13,6 +13,7 @@ Command line client for [justseed.it](https://justseed.it) seedbox service.
 - Supports requesting and reading gzip compressed data from server
 - Colored console output
 - Works in Windows, Linux and Mac OSX
+- `magnet-add.py` when compiled to binary can be used to associate magnet link in a web browser
 
 ## Installation
 

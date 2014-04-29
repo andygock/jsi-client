@@ -18,6 +18,11 @@ jsi.zip
 
 !LICENSE.TXT
 !README*
+!build-*.bat
+!build-*.cmd
 
 debug.log
 aria2.log
+
+# Compiled python
+*.pyc
