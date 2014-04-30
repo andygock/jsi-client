@@ -1455,7 +1455,7 @@ if __name__ == "__main__":
                     peer_ip = peer.getElementsByTagName('ip_address')[0].firstChild.nodeValue
                     peer_port = peer.getElementsByTagName('port')[0].firstChild.nodeValue
                     peer_id = jsi.urldecode_to_ascii(peer.getElementsByTagName('peer_id')[0].firstChild.nodeValue)
-                    peer_percentage = peer.getElementsByTagName('percentage')[0].firstChild.nodeValue
+                    peer_percentage = peer.getElementsByTagName('percentage_as_decimal')[0].firstChild.nodeValue
                     if float(peer_percentage) == 100.0:
                         print "{:>3} {:>5} ".format(peer_direction, peer_id) +\
                               Fore.GREEN + "{:>6}".format(float(peer_percentage)) + Fore.RESET + "% " +\
