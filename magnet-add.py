@@ -19,7 +19,9 @@ for magnet in args.magnets:
     sys.stderr.write("Adding \"{}\"\n".format(magnet))
     jsi.add_magnet(magnet)
 
-try:
-    input("Press ENTER to continue...")
-except SyntaxError:
-    pass
+if sys.platform != "darwin":
+	# Don't prompt to continue on Mac
+	try:
+	    input("Press ENTER to continue...")
+	except SyntaxError:
+	    pass
