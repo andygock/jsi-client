@@ -289,7 +289,7 @@ class JustSeedIt():
                 self.debug_log(xml_response)
 
         except urllib2.URLError, urllib2.HTTPError:
-            sys.stderr.write("Error: URL or HTTP error\n")
+            sys.stderr.write("Error: URL or HTTP error, server did not respond. Quitting\n")
             sys.exit()
         
         if self.check_server_response(xml_response):
@@ -300,7 +300,9 @@ class JustSeedIt():
             # Server did NOT respond with "SUCCESS"
             # self.check_server_response() will already display an error message
             self.error = True
-            return False
+            sys.stderr.write("API server did not respond with SUCCESS on last call. Quitting.")
+            sys.exit()
+            #return False
 
     @staticmethod
     def check_server_response(xml_data):
