@@ -10,7 +10,7 @@
 # PyInstaller files
 dist/
 build/
-jsi.zip
+jsi*.zip
 !build-dist.bat
 
 # pycharm files
