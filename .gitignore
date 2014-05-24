@@ -20,6 +20,7 @@ jsi*.zip
 !README*
 !build-*.bat
 !build-*.cmd
+!build-*.sh
 
 debug.log
 aria2.log
