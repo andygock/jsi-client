@@ -923,46 +923,15 @@ class JustSeedIt():
                     # prepare aria2 command line
                     aria2_options = self.aria2_options
                     file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
-                    output_dir = self.output_dir + name
-                    output_dir = self.urldecode_to_ascii(output_dir)
-                    print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(aria2_options, output_dir, file_path, url)
+                    subdir_name = os.path.dirname(file_path)
+                    file_name = os.path.basename(file_path)
+                    output_dir = self.output_dir + subdir_name
+
+                    print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(aria2_options, output_dir, file_name, url)
 
             continue  # go to next infohash
 
         return
-
-        """
-        # old aria2 script code
-
-            url_list = self.download_links([infohash])
-
-            if len(url_list) == 0:
-                sys.stderr.write("No download links available for torrent {}.\n".format(torrent_id))
-                continue
-
-            # Get torrent name, based in info hash, to use in output dir
-            name = ''
-            for torrent in self.torrents:
-                if torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue == infohash:
-                    name = torrent.getElementsByTagName('name')[0].firstChild.nodeValue
-
-            if name == '':
-                sys.stderr.write("Error: Could not find torrent name, for this info hash. Skipping\n")
-                continue
-
-            #if not options:
-            options = self.aria2_options
-
-            if self.aria2_log:
-                options += " --log-level=notice --log=" + self.aria2_logfile + ""
-    
-            for url in url_list:
-                file_path = self.urldecode_to_ascii(re.sub('https://download.justseed\.it/.{40}/', '', url))
-                output_dir = self.output_dir + name
-                output_dir = self.urldecode_to_ascii(output_dir)
-                print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(options, output_dir, file_path, url)
-        return
-        """
 
     #def info_map(self):
     #    self.list_update()
