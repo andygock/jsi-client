@@ -692,6 +692,32 @@ class JustSeedIt():
 
         return
 
+    def delete_stopped(self):
+        """ Delete all torrents in a stopped state
+        """
+        #self.list_stopped_only = True
+
+        stopped_torrents = []
+
+        self.list_update()
+        for torrent in self.torrents:
+            #self.pretty_print(torrent)
+
+            if torrent.getElementsByTagName('status')[0].firstChild.nodeValue != "stopped":
+                # skip anything that is not stopped
+                continue
+
+            # Make list of stopped torrents, we'll come back to this later
+            stopped_torrents.append(torrent)
+
+        # From out list of stopped torrents, delete each one
+        for torrent in stopped_torrents:
+            sys.stderr.write("Deleting {} {}\n".format(Fore.RED + torrent.getAttribute('id') + Fore.RESET, torrent.getElementsByTagName('name')[0].firstChild.nodeValue))
+            torrent_hash = torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue
+            self.delete(torrent_hash)
+
+        return
+
     def download_links_renew(self, infohashes):
         """ Regenerate download links for torrent
         """
@@ -1051,6 +1077,7 @@ class JustSeedIt():
 
             for torrent in self.torrents:
                 # Each torrent
+
                 self.id_to_infohash_map[torrent.getAttribute('id')] = torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue
                 self.infohash_to_name[torrent.getElementsByTagName('info_hash')[0].firstChild.nodeValue] = torrent.getElementsByTagName('name')[0].firstChild.nodeValue
 
@@ -1188,6 +1215,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action='store_true', help='debug mode, write log file to debug.log')
     parser.add_argument("--delete-tracker", type=str, metavar='TRACKER-URL', help='delete tracker (use together with -e)')
     parser.add_argument("--delete", type=str, nargs='*', metavar='INFO-HASH', help='delete torrent')
+    parser.add_argument("--delete-stopped", action='store_true', help='delete all torrents in a stopped state')
     parser.add_argument("--download-links", "--dl", type=str, nargs='*', metavar='INFO-HASH', help='get download links')
     parser.add_argument("--download-links-renew", type=str, metavar='INFO-HASH', help='generate all new download links')
     parser.add_argument("--dry", action='store_true', help='dry run')
@@ -1391,7 +1419,10 @@ if __name__ == "__main__":
 
     elif args.delete:
         jsi.delete(args.delete)
- 
+
+    elif args.delete_stopped:
+        jsi.delete_stopped()
+
     elif args.bitfield:
         param = jsi.expand(args.bitfield)
 
