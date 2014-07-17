@@ -954,6 +954,9 @@ class JustSeedIt():
                     file_name = os.path.basename(file_path)
                     output_dir = self.output_dir + subdir_name
 
+                    if self.aria2_log:
+                        aria2_options = aria2_options + " --log=\"" + self.aria2_logfile + "\" --log-level=notice"
+
                     print "aria2c {} -d \"{}\" -o \"{}\" \"{}\"".format(aria2_options, output_dir, file_name, url)
 
             continue  # go to next infohash
