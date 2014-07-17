@@ -301,8 +301,9 @@ class JustSeedIt():
             # self.check_server_response() will already display an error message
             self.error = True
             sys.stderr.write("API server did not respond with SUCCESS on last call. Quitting.")
-            sys.exit()
-            #return False
+            #sys.exit()
+            #print xml_response
+            return False # do not quit, just skip this call and try next one
 
     @staticmethod
     def check_server_response(xml_data):
