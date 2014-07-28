@@ -941,7 +941,7 @@ class JustSeedIt():
                 if link_infohash == infohash:
 
                     # found a matching file for the selected infohash
-                    filename = row.getElementsByTagName('filename')[0].firstChild.nodeValue  # not used
+                    filename = row.getElementsByTagName('file_name')[0].firstChild.nodeValue  # not used
                     url = self.urldecode_to_ascii(row.getElementsByTagName('url')[0].firstChild.nodeValue)
 
                     # get torrent name
